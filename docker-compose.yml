@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  n8n:
+    image: n8nio/n8n # Imagem oficial do N8N
+    container_name: n8n_affiliate_bot
+    restart: unless-stopped # Tenta reiniciar se parar (ótimo para manter rodando)
+    ports:
+      - "5678:5678" # Mapeia a porta 5678 do container para a 5678 da sua máquina
+    environment:
+      # --- Variáveis para o N8N ---
+      # O N8N_HOST e WEBHOOK_URL serão preenchidos com o URL do Ngrok (HTTPS)
+      # N8N_PROTOCOL deve ser 'https' quando usar Ngrok
+      - N8N_HOST=https://d8dc5085be6e.ngrok-free.app
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=https # Importante!
+      - WEBHOOK_URL=https://d8dc5085be6e.ngrok-free.app
+      - N8N_USER_MANAGEMENT_BASE_URL=https://d8dc5085be6e.ngrok-free.app
+
+      # --- Variáveis para conectar o N8N ao PostgreSQL ---
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres # O nome do serviço do PostgreSQL no Docker Compose
+      - DB_POSTGRESDB_PORT=5432 # Porta padrão do PostgreSQL
+      - DB_POSTGRESDB_DATABASE=n8n # Nome do banco de dados a ser usado pelo N8N
+      - DB_POSTGRESDB_USER=n8n_user # Usuário que o N8N usará para conectar
+      - DB_POSTGRESDB_PASSWORD=B3rn@rd0 # **Mude esta senha!**
+
+      # --- Outras configurações úteis ---
+      - N8N_DATA_FOLDER=/files # Pasta onde o N8N guardará dados de arquivos (se houver uploads, etc.)
+      - TZ=America/Sao_Paulo # Para definir o fuso horário (ajuste se necessário)
+      - GENERIC_TIMEZONE=America/Sao_Paulo # Outra variável para fuso horário
+
+    volumes:
+      - n8n_data:/files # Volume persistente para dados do N8N (workflows, credenciais, se DB for SQLite, mas aqui será usado para outros arquivos)
+    networks:
+      - n8n_network
+
+  postgres: # NOVO SERVIÇO: O banco de dados PostgreSQL
+    image: postgres:16-alpine # Imagem leve do PostgreSQL versão 16
+    container_name: n8n_postgres_db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=n8n # Nome do banco de dados (deve ser o mesmo de DB_POSTGRESDB_DATABASE no N8N)
+      - POSTGRES_USER=n8n_user # Usuário do PostgreSQL (deve ser o mesmo de DB_POSTGRESDB_USER no N8N)
+      - POSTGRES_PASSWORD=B3rn@rd0 # **Mude esta senha para algo forte e único!**
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Volume para persistir os dados do PostgreSQL
+    networks:
+      - n8n_network
+
+volumes: # Definição dos volumes persistentes
+  n8n_data:
+  postgres_data: # Novo volume para os dados do PostgreSQL
+
+networks: # Definição da rede para os containers se comunicarem
+  n8n_network:
