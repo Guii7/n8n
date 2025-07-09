@@ -1,90 +1,136 @@
-# Caminho para o executável do Ngrok. ALtere se o seu estiver em outro lugar!
-$ngrokPath = "C:\Users\guii7\ngrok\ngrok.exe" # Exemplo: ajuste para o seu caminho real
+# Caminho para o executável do Ngrok (apenas para localizar o arquivo de log agora). ALtere se o seu estiver em outro lugar!
+$ngrokPath = "C:\Users\guii7\ngrok\ngrok.exe" # <<<<<< MUDANÇA AQUI: Adicionar \ngrok.exe
 
 # Porta que o N8N está expondo localmente (verifique seu docker-compose.yml)
 $n8nPort = "5678"
 
-# --- Iniciar Ngrok em segundo plano e capturar o URL ---
+# Caminho para o arquivo de log que a Tarefa Agendada do Ngrok está criando
+# Agora, Split-Path de "C:\Users\guii7\ngrok\ngrok.exe" resultará em "C:\Users\guii7\ngrok"
+# E o caminho do log será "C:\Users\guii7\ngrok\ngrok_console.log" - O CORRETO!
+$ngrokLogFilePath = (Split-Path $ngrokPath) + "\ngrok_console.log"
 
-Write-Host "Iniciando Ngrok e obtendo URL..."
+Write-Host "Lendo o arquivo de log do Ngrok para obter a URL..."
+Write-Host "Arquivo de log do Ngrok: $ngrokLogFilePath"
 
-# Define os caminhos para os arquivos de log temporários (UM PARA CADA SAÍDA)
-$tempLogOutputPath = [System.IO.Path]::GetTempFileName()
-$tempLogErrorPath = [System.IO.Path]::GetTempFileName() # NOVO ARQUIVO PARA ERROS
-
-Write-Host "Arquivo de log de Saída do Ngrok: $tempLogOutputPath"
-Write-Host "Arquivo de log de Erros do Ngrok: $tempLogErrorPath"
-
-# Inicia o Ngrok em uma nova janela oculta e redireciona a saída para os arquivos temporários
-$ngrokProcess = Start-Process -FilePath $ngrokPath `
-    -ArgumentList "http $n8nPort --log=stdout --log-level=info --log-format=json" `
-    -NoNewWindow -PassThru `
-    -RedirectStandardOutput $tempLogOutputPath `
-    -RedirectStandardError $tempLogErrorPath # AGORA REDIRECIONANDO PARA O NOVO ARQUIVO
-
-# Verifica se o processo Ngrok foi iniciado com sucesso
-if ($null -eq $ngrokProcess) {
-    Write-Error "Falha ao iniciar o processo do Ngrok. Verifique o caminho do Ngrok e as permissões."
-    Read-Host "Pressione Enter para sair."
-    exit 1
-}
-
-Write-Host "Processo Ngrok iniciado. Aguardando a URL..."
-
-# Loop para esperar e ler a URL do Ngrok do arquivo de log de saída
+# --- Obter o URL do Ngrok do arquivo de log ---
 $publicUrl = $null
 $maxAttempts = 30 # Tenta por até 30 * 2 = 60 segundos
 $attempt = 0
 
 while ($null -eq $publicUrl -and $attempt -lt $maxAttempts) {
-    Start-Sleep -Seconds 2 # Espera 2 segundos antes de cada tentativa de leitura
+    Start-Sleep -Seconds 2
     $attempt++
     Write-Host "Tentativa $attempt de $maxAttempts para ler o log do Ngrok..."
 
-    # Lê o conteúdo do arquivo de log de saída e tenta encontrar a URL
     try {
-        # Apenas lemos do arquivo de SAÍDA PADRÃO
-        $ngrokLogContent = Get-Content -Path $tempLogOutputPath -ErrorAction SilentlyContinue | ConvertFrom-Json -ErrorAction SilentlyContinue
-        if ($null -ne $ngrokLogContent) {
-            $publicUrl = $ngrokLogContent | Where-Object { $_.msg -eq "started tunnel" -and $_.url -like "https://*" } | Select-Object -ExpandProperty url -First 1
+        # AQUI ESTÁ A MUDANÇA: Adicionamos -ReadCount 0 e -Wait para tentar ler o arquivo que pode estar travado
+        # E usamos um loop interno para garantir que o ConvertFrom-Json tenha uma entrada válida
+        $logLines = Get-Content -Path $ngrokLogFilePath -Tail 20 -ErrorAction SilentlyContinue
+
+        if ($null -ne $logLines) {
+            foreach ($line in $logLines) {
+                try {
+                    $jsonEntry = $line | ConvertFrom-Json -ErrorAction SilentlyContinue
+                    if ($null -ne $jsonEntry -and $jsonEntry.msg -eq "started tunnel" -and $jsonEntry.url -like "https://*") {
+                        $publicUrl = $jsonEntry.url
+                        break # Encontrou a URL, pode sair do loop foreach
+                    }
+                } catch {
+                    # Ignora erros de JSON malformado em linhas individuais
+                }
+            }
         }
     } catch {
-        Write-Warning "Erro ao processar o log do Ngrok: $($_.Exception.Message)"
+        Write-Warning "Erro ao acessar/processar o log do Ngrok: $($_.Exception.Message)"
     }
 }
 
-# Limpa os arquivos de log temporários (opcional, pode ser útil para depuração deixar)
-Remove-Item -Path $tempLogOutputPath -ErrorAction SilentlyContinue
-Remove-Item -Path $tempLogErrorPath -ErrorAction SilentlyContinue
-
 if ($null -eq $publicUrl) {
-    Write-Error "Não foi possível obter a URL pública do Ngrok após várias tentativas. Verifique se o Ngrok está configurado corretamente e se está gerando URLs."
-    Write-Host "Conteúdo final do log de SAÍDA (se existir):"
-    Get-Content -Path $tempLogOutputPath -ErrorAction SilentlyContinue
-    Write-Host "Conteúdo final do log de ERROS (se existir):"
-    Get-Content -Path $tempLogErrorPath -ErrorAction SilentlyContinue
+    Write-Error "Não foi possível obter a URL pública do Ngrok. Verifique se a tarefa agendada do Ngrok está funcionando e escrevendo no log: $ngrokLogFilePath"
+    Write-Host "Conteúdo final do log do Ngrok para depuração (se existir):"
+
+    # Adicionando o -ErrorAction SilentlyContinue e -Raw para tentar ler o arquivo
+    # mesmo que esteja bloqueado ou parcialmente escrito.
+    try {
+        Get-Content -Path $ngrokLogFilePath -ErrorAction SilentlyContinue -Raw
+    } catch {
+        Write-Host "Não foi possível ler o arquivo de log para depuração: $($_.Exception.Message)"
+    }
+
     Read-Host "Pressione Enter para sair."
     exit 1
 }
 
 Write-Host "URL Pública do Ngrok obtida: $publicUrl"
 
-# --- Definir a variável de ambiente para o Docker Compose ---
+# --- Definir a variável de ambiente e reiniciar Docker Compose ---
 
 # Define a variável de ambiente para a sessão atual do PowerShell
 $env:N8N_PUBLIC_URL = $publicUrl
 
 Write-Host "Variável N8N_PUBLIC_URL definida: $env:N8N_PUBLIC_URL"
 
-# --- Derrubar e Subir os containers Docker Compose ---
+# --- NOVO BLOCO: Iniciar Docker Desktop se não estiver rodando ---
+# Caminho padrão para o executável do Docker Desktop. Ajuste se o seu estiver em outro lugar!
+$dockerDesktopPath = "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+
+Write-Host "Verificando se Docker Desktop está em execucao como processo..."
+# Tenta obter o processo "Docker Desktop" (o nome da janela do aplicativo)
+$dockerDesktopProcess = Get-Process -Name "Docker Desktop" -ErrorAction SilentlyContinue
+
+if ($null -eq $dockerDesktopProcess) {
+    Write-Host "Docker Desktop nao esta rodando. Tentando iniciar..."
+    try {
+        # Inicia o Docker Desktop. O -WindowStyle Hidden e -NoNewWindow
+        # podem não ocultar totalmente a janela inicial para apps GUI, mas ele deve minimizar para a bandeja.
+        Start-Process -FilePath $dockerDesktopPath -WindowStyle Hidden -ErrorAction Stop
+        Write-Host "Docker Desktop iniciado. Aguardando inicializacao do motor Docker..."
+        Start-Sleep -Seconds 10 # Dá um tempo inicial maior para o Docker Desktop carregar o GUI e começar a inicializar o motor
+    } catch {
+        Write-Error "Falha ao iniciar Docker Desktop. Verifique se o caminho esta correto: '$dockerDesktopPath' e se voce tem permissoes."
+        Read-Host "Pressione Enter para sair."
+        exit 1
+    }
+} else {
+    Write-Host "Docker Desktop ja esta em execucao como processo."
+}
+
+# --- (Loop de espera para o Docker que já tínhamos) ---
+Write-Host "Verificando se Docker Desktop está pronto..."
+$dockerReady = $false
+$maxDockerAttempts = 20 # Tenta por até 20 * 3 = 60 segundos
+$dockerAttempt = 0
+
+while (-not $dockerReady -and $dockerAttempt -lt $maxDockerAttempts) {
+    $dockerAttempt++
+    Write-Host "Tentativa $dockerAttempt de $maxDockerAttempts para conectar ao Docker..."
+    try {
+        # Tenta um comando Docker simples para verificar a conexão
+        docker ps -q -a | Out-Null # Lista containers sem saída e descarta
+        $dockerReady = $true
+    } catch {
+        Write-Warning "Docker Desktop ainda nao esta pronto ou inacessivel: $($_.Exception.Message)"
+        Start-Sleep -Seconds 3 # Espera 3 segundos antes de tentar novamente
+    }
+}
+
+if (-not $dockerReady) {
+    Write-Error "Docker Desktop nao ficou acessivel apos varias tentativas. Por favor, verifique se esta rodando corretamente."
+    Read-Host "Pressione Enter para sair."
+    exit 1
+}
+
+# --- (Resto do script, que agora será executado apenas quando Docker estiver pronto) ---
 
 Write-Host "Parando containers Docker Compose existentes..."
-docker-compose down # Não usamos --volumes aqui para não perder os dados do N8N e PG
+# Derruba os containers N8N e PostgreSQL (mantendo os volumes de dados)
+docker-compose down
 Write-Host "Iniciando containers Docker Compose com a nova URL..."
+# Sobe os containers novamente
 docker-compose up -d
 
 Write-Host "Automação concluída!"
 Write-Host "Seu N8N deve estar acessível em: $publicUrl"
-Write-Host "O Ngrok está rodando em segundo plano. Para pará-lo, você precisará fechar a tarefa ngrok.exe no Gerenciador de Tarefas."
+Write-Host "A tarefa agendada do Ngrok deve estar mantendo o tÃºnel ativo em segundo plano."
 
 Read-Host "Pressione Enter para sair."
