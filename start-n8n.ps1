@@ -1,5 +1,5 @@
 # Caminho para o executável do Ngrok. ALtere se o seu estiver em outro lugar!
-$ngrokPath = "C:\Users\guii7\ngrok"
+$ngrokPath = "C:\Users\guii7\ngrok\ngrok.exe" # Exemplo: ajuste para o seu caminho real
 
 # Porta que o N8N está expondo localmente (verifique seu docker-compose.yml)
 $n8nPort = "5678"
@@ -8,19 +8,61 @@ $n8nPort = "5678"
 
 Write-Host "Iniciando Ngrok e obtendo URL..."
 
-# Inicia o Ngrok em uma nova janela oculta e redireciona a saída para um arquivo temporário
-# -log=stdout direciona logs para stdout
-# -log-level=info para não poluir muito
-# -log-format=json para facilitar a leitura por script
-$ngrokProcess = Start-Process -FilePath $ngrokPath -ArgumentList "http $n8nPort --log=stdout --log-level=info --log-format=json" -NoNewWindow -PassThru -RedirectStandardOutput ([System.IO.Path]::GetTempFileName()) -RedirectStandardError ([System.IO.Path]::GetTempFileName())
-Start-Sleep -Seconds 5 # Espera um pouco para o Ngrok inicializar e gerar a URL
+# Define os caminhos para os arquivos de log temporários (UM PARA CADA SAÍDA)
+$tempLogOutputPath = [System.IO.Path]::GetTempFileName()
+$tempLogErrorPath = [System.IO.Path]::GetTempFileName() # NOVO ARQUIVO PARA ERROS
 
-# Lê o arquivo de log do Ngrok para encontrar o URL HTTPS
-$ngrokLogContent = Get-Content -Path $ngrokProcess.StandardOutput -Raw | ConvertFrom-Json
-$publicUrl = $ngrokLogContent | Where-Object { $_.msg -eq "started tunnel" -and $_.url -like "https://*" } | Select-Object -ExpandProperty url -First 1
+Write-Host "Arquivo de log de Saída do Ngrok: $tempLogOutputPath"
+Write-Host "Arquivo de log de Erros do Ngrok: $tempLogErrorPath"
+
+# Inicia o Ngrok em uma nova janela oculta e redireciona a saída para os arquivos temporários
+$ngrokProcess = Start-Process -FilePath $ngrokPath `
+    -ArgumentList "http $n8nPort --log=stdout --log-level=info --log-format=json" `
+    -NoNewWindow -PassThru `
+    -RedirectStandardOutput $tempLogOutputPath `
+    -RedirectStandardError $tempLogErrorPath # AGORA REDIRECIONANDO PARA O NOVO ARQUIVO
+
+# Verifica se o processo Ngrok foi iniciado com sucesso
+if ($null -eq $ngrokProcess) {
+    Write-Error "Falha ao iniciar o processo do Ngrok. Verifique o caminho do Ngrok e as permissões."
+    Read-Host "Pressione Enter para sair."
+    exit 1
+}
+
+Write-Host "Processo Ngrok iniciado. Aguardando a URL..."
+
+# Loop para esperar e ler a URL do Ngrok do arquivo de log de saída
+$publicUrl = $null
+$maxAttempts = 30 # Tenta por até 30 * 2 = 60 segundos
+$attempt = 0
+
+while ($null -eq $publicUrl -and $attempt -lt $maxAttempts) {
+    Start-Sleep -Seconds 2 # Espera 2 segundos antes de cada tentativa de leitura
+    $attempt++
+    Write-Host "Tentativa $attempt de $maxAttempts para ler o log do Ngrok..."
+
+    # Lê o conteúdo do arquivo de log de saída e tenta encontrar a URL
+    try {
+        # Apenas lemos do arquivo de SAÍDA PADRÃO
+        $ngrokLogContent = Get-Content -Path $tempLogOutputPath -ErrorAction SilentlyContinue | ConvertFrom-Json -ErrorAction SilentlyContinue
+        if ($null -ne $ngrokLogContent) {
+            $publicUrl = $ngrokLogContent | Where-Object { $_.msg -eq "started tunnel" -and $_.url -like "https://*" } | Select-Object -ExpandProperty url -First 1
+        }
+    } catch {
+        Write-Warning "Erro ao processar o log do Ngrok: $($_.Exception.Message)"
+    }
+}
+
+# Limpa os arquivos de log temporários (opcional, pode ser útil para depuração deixar)
+Remove-Item -Path $tempLogOutputPath -ErrorAction SilentlyContinue
+Remove-Item -Path $tempLogErrorPath -ErrorAction SilentlyContinue
 
 if ($null -eq $publicUrl) {
-    Write-Error "Não foi possível obter a URL pública do Ngrok. Verifique se o Ngrok está configurado corretamente e se está gerando URLs."
+    Write-Error "Não foi possível obter a URL pública do Ngrok após várias tentativas. Verifique se o Ngrok está configurado corretamente e se está gerando URLs."
+    Write-Host "Conteúdo final do log de SAÍDA (se existir):"
+    Get-Content -Path $tempLogOutputPath -ErrorAction SilentlyContinue
+    Write-Host "Conteúdo final do log de ERROS (se existir):"
+    Get-Content -Path $tempLogErrorPath -ErrorAction SilentlyContinue
     Read-Host "Pressione Enter para sair."
     exit 1
 }

@@ -14,6 +14,9 @@ services:
       - N8N_PROTOCOL=https
       - WEBHOOK_URL=${N8N_PUBLIC_URL}
       - N8N_USER_MANAGEMENT_BASE_URL=${N8N_PUBLIC_URL}
+      - N8N_EDITOR_BASE_URL=${N8N_PUBLIC_URL}
+      - N8N_SET_PROXY_HEADER=true
+      - N8N_RUNNERS_ENABLED=true
 
       # --- Variáveis para conectar o N8N ao PostgreSQL (agora vêm do .env) ---
       - DB_TYPE=postgresdb
