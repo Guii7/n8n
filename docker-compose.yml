@@ -11,11 +11,11 @@ services:
       # --- Variáveis para o N8N ---
       # O N8N_HOST e WEBHOOK_URL serão preenchidos com o URL do Ngrok (HTTPS)
       # N8N_PROTOCOL deve ser 'https' quando usar Ngrok
-      - N8N_HOST=https://d8dc5085be6e.ngrok-free.app
+      - N8N_HOST=${N8N_PUBLIC_URL} # Usará a variável de ambiente do sistema
       - N8N_PORT=5678
-      - N8N_PROTOCOL=https # Importante!
-      - WEBHOOK_URL=https://d8dc5085be6e.ngrok-free.app
-      - N8N_USER_MANAGEMENT_BASE_URL=https://d8dc5085be6e.ngrok-free.app
+      - N8N_PROTOCOL=https
+      - WEBHOOK_URL=${N8N_PUBLIC_URL} # Usará a variável de ambiente do sistema
+      - N8N_USER_MANAGEMENT_BASE_URL=${N8N_PUBLIC_URL}
 
       # --- Variáveis para conectar o N8N ao PostgreSQL ---
       - DB_TYPE=postgresdb
