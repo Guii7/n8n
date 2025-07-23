@@ -8,7 +8,7 @@ services:
     ports:
       - "5678:5678"
     environment:
-      # --- Variáveis para o N8N (Ngrok URL - que ainda será definida pelo script) ---
+      # --- Variáveis para o N8N (Ngrok URL - que agora será sempre estática) ---
       - N8N_HOST=${N8N_PUBLIC_URL}
       - N8N_PORT=5678
       - N8N_PROTOCOL=https
@@ -17,14 +17,15 @@ services:
       - N8N_EDITOR_BASE_URL=${N8N_PUBLIC_URL}
       - N8N_SET_PROXY_HEADER=true
       - N8N_RUNNERS_ENABLED=true
+      - N8N_PUBLIC_URL=${N8N_PUBLIC_URL}
 
-      # --- Variáveis para conectar o N8N ao PostgreSQL (agora vêm do .env) ---
+      # --- Variáveis para conectar o N8N ao PostgreSQL (vêm do .env) ---
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_HOST=postgres
       - DB_POSTGRESDB_PORT=5432
-      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB} # Vem do .env
-      - DB_POSTGRESDB_USER=${POSTGRES_USER}   # Vem do .env
-      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD} # Vem do .env
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
+      - DB_POSTGRESDB_USER=${POSTGRES_USER}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
 
       # --- Outras configurações úteis ---
       - N8N_DATA_FOLDER=/files
@@ -41,9 +42,9 @@ services:
     container_name: n8n_postgres_db
     restart: unless-stopped
     environment:
-      - POSTGRES_DB=${POSTGRES_DB}         # Vem do .env
-      - POSTGRES_USER=${POSTGRES_USER}     # Vem do .env
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD} # Vem do .env
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
