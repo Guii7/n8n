@@ -10,7 +10,7 @@ Start-Sleep -Seconds 2 # Dá um momento para os processos encerrarem
 Write-Host "Iniciando Ngrok em segundo plano..."
 # Inicia o ngrok.exe como um processo desanexado do PowerShell.
 # Note que agora o comando 'ngrok' é chamado diretamente, pois o alias da Microsoft Store está no PATH.
-$null = Start-Process -FilePath "cmd.exe" -ArgumentList "/c start `"`" /b ngrok http --domain=ape-diverse-locust.ngrok-free.app $n8nPort" -NoNewWindow -ErrorAction Stop
+$null = Start-Process -FilePath "cmd.exe" -ArgumentList "/c start `"`" ngrok http --domain=ape-diverse-locust.ngrok-free.app $n8nPort" -NoNewWindow -ErrorAction Stop
 
 # --- Parte 2: Obter o URL do Ngrok através da API Local ---
 
