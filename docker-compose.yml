@@ -18,6 +18,7 @@ services:
       - N8N_SET_PROXY_HEADER=true
       - N8N_RUNNERS_ENABLED=true
       - N8N_PUBLIC_URL=${N8N_PUBLIC_URL}
+      - N8N_BLOCK_EXECUTIONS_WITH_INTERNET_ACCESS=false
 
       # --- Variáveis para conectar o N8N ao PostgreSQL (vêm do .env) ---
       - DB_TYPE=postgresdb
