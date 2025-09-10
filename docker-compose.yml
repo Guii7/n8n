@@ -1,59 +1,81 @@
-version: '3.8'
-
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: n8n_postgres_db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    env_file:
+      - .env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - n8n_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command:
+      - postgres
+      - -c
+      - max_connections=1000
+      - -c
+      - listen_addresses=*
+
+  redis:
+    image: redis:latest
+    container_name: evolution_redis
+    restart: unless-stopped
+    command: redis-server --port 6379 --appendonly yes
+    volumes:
+      - evolution_redis:/data
+    networks:
+      - n8n_network
+    expose:
+      - "6379"
+
   n8n:
     image: n8nio/n8n:latest
     container_name: n8n_affiliate_bot
     restart: unless-stopped
     ports:
       - "5678:5678"
-    environment:
-      # --- Variáveis para o N8N (Ngrok URL - que agora será sempre estática) ---
-      - N8N_HOST=${N8N_PUBLIC_URL}
-      - N8N_PORT=5678
-      - N8N_PROTOCOL=https
-      - WEBHOOK_URL=${N8N_PUBLIC_URL}
-      - N8N_USER_MANAGEMENT_BASE_URL=${N8N_PUBLIC_URL}
-      - N8N_EDITOR_BASE_URL=${N8N_PUBLIC_URL}
-      - N8N_SET_PROXY_HEADER=true
-      - N8N_RUNNERS_ENABLED=true
-      - N8N_PUBLIC_URL=${N8N_PUBLIC_URL}
-      - N8N_BLOCK_EXECUTIONS_WITH_INTERNET_ACCESS=false
-
-      # --- Variáveis para conectar o N8N ao PostgreSQL (vêm do .env) ---
-      - DB_TYPE=postgresdb
-      - DB_POSTGRESDB_HOST=postgres
-      - DB_POSTGRESDB_PORT=5432
-      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
-      - DB_POSTGRESDB_USER=${POSTGRES_USER}
-      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
-
-      # --- Outras configurações úteis ---
-      - N8N_DATA_FOLDER=/files
-      - TZ=America/Sao_Paulo
-      - GENERIC_TIMEZONE=America/Sao_Paulo
-
+    env_file:
+      - .env
     volumes:
       - n8n_data:/files
     networks:
       - n8n_network
+    depends_on:
+      postgres:
+        condition: service_healthy
 
-  postgres:
-    image: postgres:16-alpine
-    container_name: n8n_postgres_db
+  evolution-api:
+    image: evoapicloud/evolution-api:latest
+    container_name: evolution_api
     restart: unless-stopped
-    environment:
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - evolution_instances:/evolution/instances
     networks:
       - n8n_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    expose:
+      - "8080"
 
 volumes:
   n8n_data:
   postgres_data:
+  evolution_redis:
+  evolution_instances:
 
 networks:
   n8n_network:

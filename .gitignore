@@ -51,3 +51,5 @@ packages/cli/src/commands/export/outputs
 .claude/settings.local.json
 /backups
 task_log.txt
+
+.env
