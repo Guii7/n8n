@@ -71,11 +71,57 @@ services:
     expose:
       - "8080"
 
+  # Cloudflare Tunnel
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared_tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    networks:
+      - n8n_network
+    depends_on:
+      - n8n
+      - evolution-api
+
+  # N8N para Web Scraping (sem túnel)
+  n8n-scraper:
+    #image: n8nio/n8n:latest # Use a custom image if needed
+    build: ./n8n-scraper-custom
+    container_name: n8n_scraper
+    restart: unless-stopped
+    ports:
+      - "5679:5678"
+    environment:
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=${SCRAPER_DB_DATABASE}
+      - DB_POSTGRESDB_USER=${SCRAPER_DB_USER}
+      - DB_POSTGRESDB_PASSWORD=${SCRAPER_DB_PASSWORD}
+      - N8N_ENCRYPTION_KEY=${SCRAPER_N8N_ENCRYPTION_KEY}
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:5679/
+      - NODE_FUNCTION_ALLOW_EXTERNAL=puppeteer,puppeteer-extra,puppeteer-extra-plugin-stealth
+    volumes:
+      - n8n_scraper_data:/files
+      - ./puppeteer_session:/home/node/puppeteer_session
+    networks:
+      - n8n_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   n8n_data:
   postgres_data:
   evolution_redis:
   evolution_instances:
+  n8n_scraper_data:
+  puppeteer_data:
 
 networks:
   n8n_network:

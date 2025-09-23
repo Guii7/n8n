@@ -1,36 +1,35 @@
-# SCRIPT: backup-and-start-services.ps1
-# Este script faz backup completo dos volumes e inicia N8N + Evolution API
+# Este script faz backup completo dos volumes e inicia N8N + Evolution API + Cloudflare Tunnel
 
-# Parâmetros de configuração
 param(
-    [switch]$SkipBackup = $false  # Use -SkipBackup para pular o backup
+    [switch]$SkipBackup = $false
 )
 
-# Configurações
-$workingDir = "C:\Users\guii7\n8n\n8n"
-$logPath = "$workingDir\task_log.txt"
-$backupDir = "$workingDir\backups"
-$timestamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
-$backupFileName = "integrated_backup_$timestamp.tar.gz"
+Set-StrictMode -Version Latest
+
+$workingDir        = "C:\Users\guii7\n8n\n8n"
+$logPath           = "$workingDir\task_log.txt"
+$backupDir         = "$workingDir\backups"
+$timestamp         = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
+$backupFileName    = "integrated_backup_$timestamp.tar.gz"
 $dockerDesktopPath = "C:\Program Files\Docker\Docker\Docker Desktop.exe"
 
-# Volumes para backup (atualizados para a nova configuração)
 $volumes = @{
-    "n8n_data" = "n8n"
-    "postgres_data" = "postgres"
-    "evolution_redis" = "redis"
-    "evolution_instances" = "evolution"
+    "n8n_n8n_data"           = "n8n"
+    "n8n_postgres_data"      = "postgres"
+    "n8n_evolution_redis"    = "redis"
+    "n8n_evolution_instances"= "evolution"
+    "n8n_n8n_scraper_data"   = "n8n_scraper"
 }
 
-# Portas dos serviços
-$n8nPort = "5678"
-$evolutionPort = "8080"
+$localN8N          = "http://localhost:5678"
+$localEvolution    = "http://localhost:8080"
+$externalN8N       = "https://n8n.bearcavelabs.com.br"
+$externalEvolution = "https://evolution.bearcavelabs.com.br"
 
-# === INÍCIO DO LOG ===
 Start-Transcript -Path $logPath -Append
 Write-Host "=== INÍCIO DA EXECUÇÃO: $(Get-Date) ==="
 
-# Mudar para o diretório de trabalho
+# Verificação do diretório de trabalho
 try {
     Set-Location -Path $workingDir -ErrorAction Stop
     Write-Host "Diretório de trabalho: $(Get-Location)"
@@ -40,16 +39,15 @@ try {
     exit 1
 }
 
-# === 1. VERIFICAR E INICIAR DOCKER DESKTOP ===
 Write-Host "Verificando Docker Desktop..."
-
 $dockerProcess = Get-Process -Name "Docker Desktop" -ErrorAction SilentlyContinue
-if ($null -eq $dockerProcess) {
+
+if (-not $dockerProcess) {
     Write-Host "Docker Desktop não está rodando. Iniciando..."
     try {
         Start-Process -FilePath $dockerDesktopPath -WindowStyle Hidden
         Write-Host "Aguardando inicialização do Docker Desktop..."
-        Start-Sleep -Seconds 15
+        Start-Sleep -Seconds 30
     } catch {
         Write-Error "Falha ao iniciar Docker Desktop: $($_.Exception.Message)"
         Stop-Transcript
@@ -59,20 +57,16 @@ if ($null -eq $dockerProcess) {
     Write-Host "Docker Desktop já está em execução."
 }
 
-# Aguardar Docker estar pronto
 Write-Host "Verificando se Docker está acessível..."
 $dockerReady = $false
-$maxAttempts = 30
-$attempt = 0
 
-while (-not $dockerReady -and $attempt -lt $maxAttempts) {
-    $attempt++
-    Write-Host "Tentativa $attempt de $maxAttempts..."
+for ($attempt=1; $attempt -le 30 -and -not $dockerReady; $attempt++) {
+    Write-Host "Tentativa $attempt de 30..."
     try {
-        $null = docker version --format '{{.Server.Version}}' 2>$null
-        if ($LASTEXITCODE -eq 0) {
+        $dockerVersion = docker version --format '{{.Server.Version}}' 2>$null
+        if ($LASTEXITCODE -eq 0 -and $dockerVersion) {
             $dockerReady = $true
-            Write-Host "Docker está pronto!"
+            Write-Host "Docker está pronto! Versão: $dockerVersion"
         }
     } catch {
         Write-Warning "Docker ainda não está pronto..."
@@ -84,143 +78,247 @@ while (-not $dockerReady -and $attempt -lt $maxAttempts) {
 }
 
 if (-not $dockerReady) {
-    Write-Error "Docker não ficou acessível após $maxAttempts tentativas."
+    Write-Error "Docker não ficou acessível após 30 tentativas."
     Stop-Transcript
     exit 1
 }
 
-# === 2. BACKUP DOS VOLUMES ===
+# Seção de Backup
 if (-not $SkipBackup) {
     Write-Host "=== INICIANDO BACKUP ==="
-
-    # Parar containers para backup consistente
     Write-Host "Parando containers..."
-    docker-compose down
-    Start-Sleep -Seconds 5
 
-    # Criar diretório de backup
-    if (-not (Test-Path $backupDir)) {
-        New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
-        Write-Host "Diretório de backup criado: $backupDir"
+    try {
+        docker-compose down
+        Start-Sleep -Seconds 5
+    } catch {
+        Write-Warning "Erro ao parar containers, continuando..."
     }
 
-    # Construir comando de volumes para o backup
+    if (-not (Test-Path $backupDir)) {
+        try {
+            New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
+            Write-Host "Diretório de backup criado: $backupDir"
+        } catch {
+            Write-Error "Falha ao criar diretório de backup: $($_.Exception.Message)"
+            Stop-Transcript
+            exit 1
+        }
+    }
+
     $volumeArgs = @()
     foreach ($volume in $volumes.GetEnumerator()) {
         $volumeArgs += "--volume"
         $volumeArgs += "$($volume.Key):/$($volume.Value)"
     }
-
     $volumeArgs += "--volume"
     $volumeArgs += "$backupDir\:/backup"
 
-    # Fazer backup
     Write-Host "Criando backup: $backupFileName"
     try {
-        $backupCmd = @("run", "--rm") + $volumeArgs + @("alpine", "tar", "czf", "/backup/$backupFileName") + ($volumes.Values | ForEach-Object { "/$_" })
+        $pathsToBackup = $volumes.Values | ForEach-Object { "/$_" }
+        $backupCmd = @("run", "--rm") + $volumeArgs + @("alpine", "tar", "czf", "/backup/$backupFileName") + $pathsToBackup
+
+        Write-Host "Executando comando docker para backup..."
         & docker @backupCmd
 
         if ($LASTEXITCODE -eq 0) {
-            $backupPath = "$backupDir\$backupFileName"
-            $backupSize = [math]::Round((Get-Item $backupPath).Length / 1MB, 2)
-            Write-Host "Backup concluído com sucesso!"
-            Write-Host "Arquivo: $backupPath"
-            Write-Host "Tamanho: $backupSize MB"
+            $backupPath = Join-Path $backupDir $backupFileName
+            if (Test-Path $backupPath) {
+                $backupSize = [math]::Round((Get-Item $backupPath).Length / 1MB, 2)
+                Write-Host "Backup concluído com sucesso: $backupPath ($backupSize MB)"
+            } else {
+                Write-Warning "Arquivo de backup não encontrado após o comando ter sido executado com sucesso."
+            }
         } else {
-            throw "Comando docker falhou com código: $LASTEXITCODE"
+            # Modificado para não usar 'throw' para evitar possíveis problemas de parsing.
+            Write-Error "O comando docker para o backup falhou com o código de saída: $LASTEXITCODE"
         }
     } catch {
-        Write-Error "Erro durante backup: $($_.Exception.Message)"
-        Stop-Transcript
-        exit 1
+        Write-Error "Ocorreu uma exceção durante o processo de backup: $($_.Exception.Message)"
     }
 } else {
     Write-Host "Backup pulado conforme solicitado."
 }
 
-# === 3. INICIAR SERVIÇOS ===
+# Iniciando serviços
 Write-Host "=== INICIANDO SERVIÇOS ==="
-
-Write-Host "Iniciando containers..."
-docker-compose up -d
-
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "Falha ao iniciar containers"
+try {
+    docker-compose up -d
+    if ($LASTEXITCODE -ne 0) {
+        # Usando Write-Error em vez de throw por consistência
+        Write-Error "Falha ao executar docker-compose up."
+        Stop-Transcript
+        exit 1
+    }
+    Write-Host "Containers iniciados com sucesso!"
+} catch {
+    Write-Error "Erro ao iniciar containers: $($_.Exception.Message)"
     Stop-Transcript
     exit 1
 }
 
-# === 4. VERIFICAR SAÚDE DOS SERVIÇOS ===
 Write-Host "=== VERIFICANDO SERVIÇOS ==="
-
-# Aguardar serviços ficarem prontos
+Write-Host "Aguardando 30 segundos para os serviços estabilizarem..."
 Start-Sleep -Seconds 30
 
-# Verificar PostgreSQL
+# Verificação PostgreSQL
 Write-Host "Verificando PostgreSQL..."
-$pgCheck = docker exec n8n_postgres_db pg_isready -U n8n_user -d n8n 2>$null
-if ($LASTEXITCODE -eq 0) {
-    Write-Host "✓ PostgreSQL está funcionando"
-} else {
-    Write-Warning "⚠ PostgreSQL pode não estar pronto"
-}
-
-# Verificar Redis
-Write-Host "Verificando Redis..."
-$redisCheck = docker exec evolution_redis redis-cli ping 2>$null
-if ($redisCheck -eq "PONG") {
-    Write-Host "✓ Redis está funcionando"
-} else {
-    Write-Warning "⚠ Redis pode não estar pronto"
-}
-
-# Verificar N8N
-Write-Host "Verificando N8N (porta $n8nPort)..."
 try {
-    $n8nResponse = Invoke-RestMethod -Uri "http://localhost:$n8nPort" -TimeoutSec 10 -ErrorAction Stop
-    Write-Host "✓ N8N está acessível"
-} catch {
-    Write-Warning "⚠ N8N pode não estar pronto ainda"
-}
-
-# Verificar Evolution API
-Write-Host "Verificando Evolution API (porta $evolutionPort)..."
-try {
-    $evolutionResponse = Invoke-RestMethod -Uri "http://localhost:$evolutionPort" -TimeoutSec 10 -ErrorAction Stop
-    if ($evolutionResponse.status -eq 200) {
-        Write-Host "✓ Evolution API está funcionando"
-        Write-Host "  Version: $($evolutionResponse.version)"
-        Write-Host "  Swagger: http://localhost:$evolutionPort/docs"
-        Write-Host "  Manager: http://localhost:$evolutionPort/manager"
+    docker exec n8n_postgres_db pg_isready 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "✓ PostgreSQL ok"
+    } else {
+        Write-Warning "⚠ PostgreSQL não pronto"
     }
 } catch {
-    Write-Warning "⚠ Evolution API pode não estar pronto ainda"
+    Write-Warning "⚠ Erro ao verificar PostgreSQL: $($_.Exception.Message)"
 }
 
-# === 5. MOSTRAR STATUS FINAL ===
+# Verificação Redis
+Write-Host "Verificando Redis..."
+try {
+    $redisCheck = docker exec evolution_redis redis-cli ping 2>$null
+    if ($redisCheck -match "PONG") {
+        Write-Host "✓ Redis ok"
+    } else {
+        Write-Warning "⚠ Redis não pronto"
+    }
+} catch {
+    Write-Warning "⚠ Erro ao verificar Redis: $($_.Exception.Message)"
+}
+
+# Verificação Cloudflare Tunnel
+Write-Host "Verificando Cloudflare Tunnel..."
+try {
+    $tunnelLogs = docker logs cloudflared_tunnel --tail 10 2>$null
+    if ($tunnelLogs -match "Registered tunnel connection") {
+        Write-Host "✓ Cloudflare Tunnel conectado"
+        $connections = ($tunnelLogs | Select-String "Registered tunnel connection").Count
+        if ($connections -gt 0) {
+            Write-Host "  Conexões: $connections"
+        }
+    } else {
+        Write-Warning "⚠ Tunnel pode não estar conectado"
+    }
+} catch {
+    Write-Warning "⚠ Erro ao verificar Tunnel: $($_.Exception.Message)"
+}
+
+# Verificação N8N local
+Write-Host "Verificando N8N local..."
+try {
+    Invoke-RestMethod -Uri $localN8N -TimeoutSec 10 -ErrorAction Stop | Out-Null
+    Write-Host "✓ N8N local ok"
+} catch {
+    Write-Warning "⚠ N8N local não pronto: $($_.Exception.Message)"
+}
+
+# Verificação Evolution API local
+Write-Host "Verificando Evolution API local..."
+try {
+    $evolutionResponse = Invoke-RestMethod -Uri $localEvolution -TimeoutSec 10 -ErrorAction Stop
+    Write-Host "✓ Evolution API ok"
+    if ($evolutionResponse.version) {
+        Write-Host "  Version: $($evolutionResponse.version)"
+    }
+} catch {
+    Write-Warning "⚠ Evolution API não pronta: $($_.Exception.Message)"
+}
+
+# Verificação N8N Scraper
+Write-Host "Verificando N8N Scraper..."
+try {
+    Invoke-RestMethod -Uri "http://localhost:5679" -TimeoutSec 10 -ErrorAction Stop | Out-Null
+    Write-Host "✓ N8N Scraper ok"
+} catch {
+    Write-Warning "⚠ N8N Scraper não pronto: $($_.Exception.Message)"
+}
+
+Write-Host "=== TESTANDO CONECTIVIDADE EXTERNA ==="
+
+# Teste N8N externo
+Write-Host "Testando N8N externo..."
+try {
+    Invoke-RestMethod -Uri $externalN8N -TimeoutSec 15 -ErrorAction Stop | Out-Null
+    Write-Host "✓ N8N externo acessível"
+} catch {
+    if ($_.Exception.Message -match "not known|resolved") {
+        Write-Warning "⚠ DNS N8N ainda propagando"
+    } else {
+        Write-Warning "⚠ N8N externo indisponível: $($_.Exception.Message)"
+    }
+}
+
+# Teste Evolution API externa
+Write-Host "Testando Evolution API externa..."
+try {
+    Invoke-RestMethod -Uri $externalEvolution -TimeoutSec 15 -ErrorAction Stop | Out-Null
+    Write-Host "✓ Evolution externo acessível"
+} catch {
+    if ($_.Exception.Message -match "not known|resolved") {
+        Write-Warning "⚠ DNS Evolution ainda propagando"
+    } else {
+        Write-Warning "⚠ Evolution externo indisponível: $($_.Exception.Message)"
+    }
+}
+
+# Status dos containers
 Write-Host "=== STATUS DOS CONTAINERS ==="
-docker-compose ps
+try {
+    docker-compose ps
+} catch {
+    Write-Warning "Erro ao obter status"
+}
 
 Write-Host ""
 Write-Host "=== URLS DOS SERVIÇOS ==="
-Write-Host "N8N:              http://localhost:$n8nPort"
-Write-Host "Evolution API:    http://localhost:$evolutionPort"
-Write-Host "Evolution Docs:   http://localhost:$evolutionPort/docs"
-Write-Host "Evolution Manager: http://localhost:$evolutionPort/manager"
+Write-Host "LOCAIS:"
+Write-Host "  N8N:               $localN8N"
+Write-Host "  Evolution API:     $localEvolution"
+Write-Host "  Evolution Docs:    $localEvolution/docs"
+Write-Host "  Evolution Manager: $localEvolution/manager"
+Write-Host "  N8N Scraper:       http://localhost:5679"
+Write-Host ""
+Write-Host "EXTERNOS:"
+Write-Host "  N8N:               $externalN8N"
+Write-Host "  Evolution API:     $externalEvolution"
+Write-Host "  Evolution Docs:    $externalEvolution/docs"
+Write-Host "  Evolution Manager: $externalEvolution/manager"
 
 Write-Host ""
-Write-Host "=== EXECUÇÃO CONCLUÍDA: $(Get-Date) ==="
+Write-Host "=== INFO TUNNEL ==="
+try {
+    $tunnelInfo = docker logs cloudflared_tunnel --tail 5 2>$null
+    if ($tunnelInfo) {
+        foreach ($line in $tunnelInfo) {
+            Write-Host "  $line"
+        }
+    }
+} catch {
+    Write-Warning "Não foi possível obter logs do tunnel"
+}
 
-# Limpar logs antigos (manter apenas os últimos 10 backups)
+# Limpeza de backups antigos
 if (Test-Path $backupDir) {
-    $oldBackups = Get-ChildItem -Path $backupDir -Filter "integrated_backup_*.tar.gz" |
-                  Sort-Object LastWriteTime -Descending |
-                  Select-Object -Skip 10
-
-    if ($oldBackups) {
-        Write-Host "Removendo $($oldBackups.Count) backup(s) antigo(s)..."
-        $oldBackups | Remove-Item -Force
+    try {
+        $oldBackups = Get-ChildItem -Path $backupDir -Filter "integrated_backup_*.tar.gz" | Sort-Object LastWriteTime -Descending | Select-Object -Skip 10
+        if ($oldBackups) {
+            Write-Host "Removendo $($oldBackups.Count) backup(s) antigo(s)..."
+            foreach ($backup in $oldBackups) {
+                Remove-Item -Path $backup.FullName -Force
+            }
+        }
+    } catch {
+        Write-Warning "Erro ao limpar backups antigos: $($_.Exception.Message)"
     }
 }
 
+Write-Host ""
+Write-Host "DICAS:"
+Write-Host "- Se URLs externas falharem, aguarde propagação DNS"
+Write-Host "- Use 'docker-compose logs cloudflared' para debug"
+Write-Host "- Verifique Cloudflare dashboard para status"
+
+Write-Host "=== EXECUÇÃO CONCLUÍDA: $(Get-Date) ==="
 Stop-Transcript
