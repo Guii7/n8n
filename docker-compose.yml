@@ -50,6 +50,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_started
 
   evolution-api:
     image: evoapicloud/evolution-api:latest
@@ -100,6 +102,11 @@ services:
       - DB_POSTGRESDB_DATABASE=${SCRAPER_DB_DATABASE}
       - DB_POSTGRESDB_USER=${SCRAPER_DB_USER}
       - DB_POSTGRESDB_PASSWORD=${SCRAPER_DB_PASSWORD}
+      - EXECUTIONS_PROCESS=runner
+      - QUEUE_BULL_REDIS_HOST=redis
+      - QUEUE_BULL_REDIS_PORT=6379
+      - N8N_EXECUTION_MODE=queue
+      - N8N_DISABLE_SCHEDULED_WORKFLOWS=true
       - N8N_ENCRYPTION_KEY=${SCRAPER_N8N_ENCRYPTION_KEY}
       - N8N_HOST=localhost
       - N8N_PORT=5678
@@ -114,6 +121,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_started
 
 volumes:
   n8n_data:
