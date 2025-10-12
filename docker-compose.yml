@@ -35,6 +35,24 @@ services:
     expose:
       - "6379"
 
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: evolution_rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=user
+      - RABBITMQ_DEFAULT_PASS=password
+      - RABBITMQ_LOAD_DEFINITIONS=/etc/rabbitmq/definitions.json
+      - RABBITMQ_DEFINITIONS_IMPORT_FILE=/etc/rabbitmq/definitions.json
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./rabbitmq/definitions/rabbitmq-definitions.json:/etc/rabbitmq/definitions.json:ro
+    networks:
+      - n8n_network
+
   n8n:
     image: n8nio/n8n:latest
     container_name: n8n_affiliate_bot
@@ -70,6 +88,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+      rabbitmq:
+        condition: service_started
     expose:
       - "8080"
 
@@ -88,49 +108,33 @@ services:
       - evolution-api
 
   # N8N para Web Scraping (sem túnel)
-  n8n-scraper:
-    #image: n8nio/n8n:latest # Use a custom image if needed
-    build: ./n8n-scraper-custom
-    container_name: n8n_scraper
-    restart: unless-stopped
-    ports:
-      - "5679:5678"
-    environment:
-      - DB_TYPE=postgresdb
-      - DB_POSTGRESDB_HOST=postgres
-      - DB_POSTGRESDB_PORT=5432
-      - DB_POSTGRESDB_DATABASE=${SCRAPER_DB_DATABASE}
-      - DB_POSTGRESDB_USER=${SCRAPER_DB_USER}
-      - DB_POSTGRESDB_PASSWORD=${SCRAPER_DB_PASSWORD}
-      - EXECUTIONS_PROCESS=runner
-      - QUEUE_BULL_REDIS_HOST=redis
-      - QUEUE_BULL_REDIS_PORT=6379
-      - N8N_EXECUTION_MODE=queue
-      - N8N_DISABLE_SCHEDULED_WORKFLOWS=true
-      - N8N_ENCRYPTION_KEY=${SCRAPER_N8N_ENCRYPTION_KEY}
-      - N8N_HOST=localhost
-      - N8N_PORT=5678
-      - N8N_PROTOCOL=http
-      - WEBHOOK_URL=http://localhost:5679/
-      - NODE_FUNCTION_ALLOW_EXTERNAL=puppeteer,puppeteer-extra,puppeteer-extra-plugin-stealth
-    volumes:
-      - n8n_scraper_data:/files
-      - ./puppeteer_session:/home/node/puppeteer_session
-    networks:
-      - n8n_network
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_started
+  # n8n-scraper:
+  #   build: ./n8n-scraper-custom
+  #   container_name: n8n_scraper
+  #   restart: unless-stopped
+  #   ports:
+  #     - "5679:5678"
+  #   env_file:
+  #     - .env.scraper # <-- ALTERAÇÃO PRINCIPAL AQUI
+  #   volumes:
+  #     - n8n_scraper_data:/files
+  #     - ./puppeteer_session:/home/node/puppeteer_session
+  #   networks:
+  #     - n8n_network
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_started
 
 volumes:
   n8n_data:
   postgres_data:
   evolution_redis:
   evolution_instances:
-  n8n_scraper_data:
+#  n8n_scraper_data:
   puppeteer_data:
+  rabbitmq_data:
 
 networks:
   n8n_network:

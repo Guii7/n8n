@@ -64,7 +64,7 @@ if (-not $SkipBackup) {
     Write-Host ""
     Write-Host "2. Fazendo backup rápido..."
     try {
-        & ".\backup-and-start-services-fixed.ps1" -SkipBackup:$false
+        & ".\backup-and-start-services.ps1" -SkipBackup:$false
         if ($LASTEXITCODE -ne 0) {
             Write-Warning "Backup falhou, mas continuando..."
         }
@@ -217,11 +217,11 @@ Write-Host ""
 Write-Host "=== INICIALIZAÇÃO CONCLUÍDA ==="
 Write-Host ""
 Write-Host "COMANDOS ÚTEIS:"
-Write-Host "  Status:    .\manage-services-fixed.ps1 status"
-Write-Host "  Logs:      .\manage-services-fixed.ps1 logs -Follow"
-Write-Host "  Tunnel:    .\manage-services-fixed.ps1 tunnel"
-Write-Host "  Parar:     .\manage-services-fixed.ps1 stop"
-Write-Host "  Backup:    .\manage-services-fixed.ps1 backup"
+Write-Host "  Status:    .\manage-services.ps1 status"
+Write-Host "  Logs:      .\manage-services.ps1 logs -Follow"
+Write-Host "  Tunnel:    .\manage-services.ps1 tunnel"
+Write-Host "  Parar:     .\manage-services.ps1 stop"
+Write-Host "  Backup:    .\manage-services.ps1 backup"
 Write-Host ""
 Write-Host "NOTAS:"
 Write-Host "• Se serviços não estão acessíveis ainda, aguarde mais alguns minutos"

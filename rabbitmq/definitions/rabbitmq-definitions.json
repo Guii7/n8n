@@ -1,0 +1,40 @@
+{
+  "rabbit_version": "13.0.0",
+  "rabbitmq_version": "3.13.0",
+  "product_name": "RabbitMQ",
+  "users": [
+    {
+      "name": "user",
+      "password": "password",
+      "password_hash": "...",
+      "hash_function": "rabbit_password_hashing_sha256",
+      "tags": ["administrator"],
+      "limits": {}
+    }
+  ],
+  "vhosts": [
+    {
+      "name": "/"
+    }
+  ],
+  "permissions": [
+    {
+      "user": "user",
+      "vhost": "/",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
+  "queues": [
+    {
+      "name": "whatsapp_sending_queue",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    }
+  ],
+  "exchanges": [],
+  "bindings": []
+}
