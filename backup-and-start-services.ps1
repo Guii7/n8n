@@ -6,7 +6,7 @@ param(
 
 Set-StrictMode -Version Latest
 
-$workingDir        = "C:\Users\guii7\n8n\n8n"
+$workingDir        = "C:\Users\guii7\bear_cave_labs\n8n"
 $logPath           = "$workingDir\task_log.txt"
 $backupDir         = "$workingDir\backups"
 $timestamp         = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
@@ -18,7 +18,8 @@ $volumes = @{
     "n8n_postgres_data"      = "postgres"
     "n8n_evolution_redis"    = "redis"
     "n8n_evolution_instances"= "evolution"
-    "n8n_n8n_scraper_data"   = "n8n_scraper"
+    "n8n_rabbitmq_data"      = "rabbitmq"
+    "n8n_puppeteer_data"     = "puppeteer"
 }
 
 $localN8N          = "http://localhost:5678"
@@ -235,6 +236,33 @@ try {
     Write-Warning "⚠ N8N Scraper não pronto: $($_.Exception.Message)"
 }
 
+# Verificação Supabase Studio
+Write-Host "Verificando Supabase Studio..."
+try {
+    $studioResponse = Invoke-RestMethod -Uri "http://localhost:3000" -TimeoutSec 10 -ErrorAction Stop
+    Write-Host "✓ Supabase Studio ok"
+} catch {
+    Write-Warning "⚠ Supabase Studio não pronto: $($_.Exception.Message)"
+}
+
+# Verificação Kong (API Gateway)
+Write-Host "Verificando Kong API Gateway..."
+try {
+    $kongResponse = Invoke-RestMethod -Uri "http://localhost:8888" -TimeoutSec 10 -ErrorAction Stop
+    Write-Host "✓ Kong API Gateway ok"
+} catch {
+    Write-Warning "⚠ Kong não pronto: $($_.Exception.Message)"
+}
+
+# Verificação Postgres Meta (API de metadados)
+Write-Host "Verificando Supabase Postgres Meta..."
+try {
+    $metaResponse = Invoke-RestMethod -Uri "http://localhost:8888/pg" -TimeoutSec 10 -ErrorAction Stop
+    Write-Host "✓ Postgres Meta ok"
+} catch {
+    Write-Warning "⚠ Postgres Meta não pronto: $($_.Exception.Message)"
+}
+
 Write-Host "=== TESTANDO CONECTIVIDADE EXTERNA ==="
 
 # Teste N8N externo
@@ -279,6 +307,8 @@ Write-Host "  Evolution API:     $localEvolution"
 Write-Host "  Evolution Docs:    $localEvolution/docs"
 Write-Host "  Evolution Manager: $localEvolution/manager"
 Write-Host "  N8N Scraper:       http://localhost:5679"
+Write-Host "  Supabase Studio:   http://localhost:3000"
+Write-Host "  Kong (API):        http://localhost:8888"
 Write-Host ""
 Write-Host "EXTERNOS:"
 Write-Host "  N8N:               $externalN8N"

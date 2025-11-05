@@ -5,7 +5,7 @@ param(
     [switch]$Fix = $false
 )
 
-$workingDir = "C:\Users\guii7\n8n\n8n"
+$workingDir = "C:\Users\guii7\bear_cave_labs\n8n"
 Set-Location -Path $workingDir
 
 Write-Host "=== DIAGNÓSTICO DOS VOLUMES DOCKER - CONFIGURAÇÃO ATUALIZADA ==="
@@ -30,13 +30,14 @@ docker volume ls --filter "name=n8n"
 Write-Host ""
 Write-Host "2. DETALHES DOS VOLUMES:"
 
-# Volumes esperados (CORRIGIDOS para os nomes reais)
+# Volumes esperados
 $expectedVolumes = @(
     "n8n_n8n_data",
     "n8n_postgres_data",
-    "n8n_evolution_redis",      # Volume real do Redis
-    "n8n_evolution_instances",  # Volume real das instâncias
-    "n8n_n8n_scraper_data"     # Novo volume do N8N Scraper
+    "n8n_evolution_redis",
+    "n8n_evolution_instances",
+    "n8n_rabbitmq_data",
+    "n8n_puppeteer_data"
 )
 
 foreach ($volume in $expectedVolumes) {

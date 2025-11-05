@@ -6,19 +6,21 @@ param(
     [ValidateSet("start", "stop", "restart", "status", "logs", "backup", "restore", "update", "tunnel", "help")]
     [string]$Action = "status",
 
-    [string]$Service = "all",  # all, n8n, evolution, postgres, redis, cloudflared, scraper
+    [string]$Service = "all",  # all, n8n, evolution, postgres, redis, cloudflared, scraper, studio, kong, meta, rest, auth, storage, realtime, rabbitmq
     [string]$BackupFile = "",
     [switch]$Follow = $false,   # Para logs
     [switch]$External = $false  # Para testar URLs externas
 )
 
-$workingDir = "C:\Users\guii7\n8n\n8n"
+$workingDir = "C:\Users\guii7\bear_cave_labs\n8n"
 $backupDir = "$workingDir\backups"
 
 # URLs dos serviços
 $localN8N = "http://localhost:5678"
 $localEvolution = "http://localhost:8080"
 $localScraper = "http://localhost:5679"
+$localStudio = "http://localhost:3000"
+$localKong = "http://localhost:8888"
 $externalN8N = "https://n8n.bearcavelabs.com.br"
 $externalEvolution = "https://evolution.bearcavelabs.com.br"
 
@@ -32,9 +34,9 @@ try {
 
 function Show-Help {
     Write-Host @"
-=== GERENCIADOR DE SERVIÇOS N8N + EVOLUTION API + CLOUDFLARE TUNNEL ===
+=== GERENCIADOR DE SERVIÇOS N8N + EVOLUTION API + SUPABASE + CLOUDFLARE TUNNEL ===
 
-USO: .\manage-services-fixed.ps1 [AÇÃO] [OPÇÕES]
+USO: .\manage-services.ps1 [AÇÃO] [OPÇÕES]
 
 AÇÕES:
   start     - Inicia todos os serviços
@@ -49,17 +51,35 @@ AÇÕES:
   help      - Exibe esta ajuda
 
 OPÇÕES:
-  -Service    - Serviço específico: all, n8n, evolution, postgres, redis, cloudflared, scraper
+  -Service    - Serviço específico: all, n8n, evolution, postgres, redis, cloudflared,
+                scraper, studio, kong, meta, rest, auth, storage, realtime, rabbitmq
   -Follow     - Seguir logs em tempo real (usar com logs)
   -External   - Testar URLs externas também (usar com status)
   -BackupFile - Arquivo de backup para restaurar
 
 EXEMPLOS:
-  .\manage-services-fixed.ps1 start
-  .\manage-services-fixed.ps1 status -External
-  .\manage-services-fixed.ps1 logs -Service cloudflared -Follow
-  .\manage-services-fixed.ps1 tunnel
-  .\manage-services-fixed.ps1 restore -BackupFile "integrated_backup_2025-01-01_12-00-00.tar.gz"
+  .\manage-services.ps1 start
+  .\manage-services.ps1 status -External
+  .\manage-services.ps1 logs -Service studio -Follow
+  .\manage-services.ps1 logs -Service kong
+  .\manage-services.ps1 tunnel
+  .\manage-services.ps1 restore -BackupFile "integrated_backup_2025-01-01_12-00-00.tar.gz"
+
+SERVIÇOS DISPONÍVEIS:
+  - n8n: N8N principal (workflows)
+  - evolution: Evolution API (WhatsApp)
+  - postgres: PostgreSQL (banco compartilhado)
+  - redis: Redis (cache Evolution)
+  - rabbitmq: RabbitMQ (mensageria)
+  - cloudflared: Cloudflare Tunnel
+  - scraper: N8N Scraper
+  - studio: Supabase Studio (UI)
+  - kong: Kong API Gateway
+  - meta: Supabase Postgres Meta
+  - rest: PostgREST (REST API)
+  - auth: Supabase Auth (GoTrue)
+  - storage: Supabase Storage
+  - realtime: Supabase Realtime
 "@
 }
 
@@ -211,6 +231,34 @@ function Show-Status {
         Write-Host "✗ N8N Scraper: Não acessível"
     }
 
+    # Verificar Supabase Studio
+    try {
+        $studioResponse = Invoke-RestMethod -Uri $localStudio -TimeoutSec 5 -ErrorAction Stop
+        Write-Host "✓ Supabase Studio: $localStudio"
+        Write-Host "  └─ Interface de gerenciamento do banco de dados"
+    } catch {
+        Write-Host "✗ Supabase Studio: Não acessível"
+    }
+
+    # Verificar Kong API Gateway
+    try {
+        $kongResponse = Invoke-RestMethod -Uri $localKong -TimeoutSec 5 -ErrorAction Stop
+        Write-Host "✓ Kong (API Gateway): $localKong"
+        Write-Host "  ├─ Meta API: $localKong/pg"
+        Write-Host "  ├─ REST API: $localKong/rest/v1"
+        Write-Host "  └─ Auth API: $localKong/auth/v1"
+    } catch {
+        Write-Host "✗ Kong: Não acessível"
+    }
+
+    # Verificar RabbitMQ
+    try {
+        $rabbitResponse = Invoke-RestMethod -Uri "http://localhost:15672" -TimeoutSec 5 -ErrorAction Stop
+        Write-Host "✓ RabbitMQ Management: http://localhost:15672"
+    } catch {
+        Write-Host "✗ RabbitMQ Management: Não acessível (http://localhost:15672)"
+    }
+
     # Testes externos (se solicitado)
     if ($External) {
         Write-Host ""
@@ -257,6 +305,14 @@ function Show-Logs {
         "redis" = "evolution_redis"
         "cloudflared" = "cloudflared_tunnel"
         "scraper" = "n8n_scraper"
+        "studio" = "supabase_studio"
+        "kong" = "supabase_kong"
+        "meta" = "supabase_meta"
+        "rest" = "supabase_rest"
+        "auth" = "supabase_auth"
+        "storage" = "supabase_storage"
+        "realtime" = "supabase_realtime"
+        "rabbitmq" = "evolution_rabbitmq"
     }
 
     $container = $containerMap[$Service]
@@ -391,16 +447,17 @@ function New-Backup {
         }
     }
 
-    # Fazer backup (volumes atualizados)
+    # Fazer backup (volumes atualizados - removido n8n_scraper_data, adicionado rabbitmq e puppeteer)
     try {
         docker run --rm `
             --volume n8n_n8n_data:/n8n `
             --volume n8n_postgres_data:/postgres `
             --volume n8n_evolution_redis:/redis `
             --volume n8n_evolution_instances:/evolution `
-            --volume n8n_n8n_scraper_data:/n8n_scraper `
+            --volume n8n_rabbitmq_data:/rabbitmq `
+            --volume n8n_puppeteer_data:/puppeteer `
             --volume "${backupDir}:/backup" `
-            alpine tar czf /backup/$backupFileName -C / n8n postgres redis evolution n8n_scraper
+            alpine tar czf /backup/$backupFileName -C / n8n postgres redis evolution rabbitmq puppeteer
 
         if ($LASTEXITCODE -eq 0) {
             $backupPath = "$backupDir\$backupFileName"
@@ -463,13 +520,14 @@ function Restore-Backup {
     }
 
     try {
-        # Restaurar backup (volumes atualizados)
+        # Restaurar backup (volumes atualizados - removido n8n_scraper_data, adicionado rabbitmq e puppeteer)
         docker run --rm `
             --volume n8n_n8n_data:/n8n `
             --volume n8n_postgres_data:/postgres `
             --volume n8n_evolution_redis:/redis `
             --volume n8n_evolution_instances:/evolution `
-            --volume n8n_n8n_scraper_data:/n8n_scraper `
+            --volume n8n_rabbitmq_data:/rabbitmq `
+            --volume n8n_puppeteer_data:/puppeteer `
             --volume "${backupDir}:/backup" `
             alpine sh -c "cd / && tar xzf /backup/$BackupFile"
 
