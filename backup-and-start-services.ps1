@@ -6,12 +6,31 @@ param(
 
 Set-StrictMode -Version Latest
 
-$workingDir        = "C:\Users\guii7\bear_cave_labs\n8n"
+# Carregar configurações do arquivo .env.scripts
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$envFile = Join-Path $scriptDir ".env.scripts"
+
+if (-not (Test-Path $envFile)) {
+    Write-Error "Arquivo de configuração não encontrado: $envFile"
+    Write-Error "Copie .env.scripts.example para .env.scripts e configure os valores."
+    exit 1
+}
+
+# Função para carregar variáveis do arquivo .env.scripts
+Get-Content $envFile | ForEach-Object {
+    if ($_ -match '^([^#=]+)=(.*)$') {
+        $name = $matches[1].Trim()
+        $value = $matches[2].Trim()
+        Set-Variable -Name $name -Value $value -Scope Script
+    }
+}
+
+$workingDir        = $SCRIPTS_WORKING_DIR
 $logPath           = "$workingDir\task_log.txt"
 $backupDir         = "$workingDir\backups"
 $timestamp         = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
 $backupFileName    = "integrated_backup_$timestamp.tar.gz"
-$dockerDesktopPath = "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+$dockerDesktopPath = $DOCKER_DESKTOP_PATH
 
 $volumes = @{
     "n8n_n8n_data"           = "n8n"
@@ -22,10 +41,10 @@ $volumes = @{
     "n8n_puppeteer_data"     = "puppeteer"
 }
 
-$localN8N          = "http://localhost:5678"
-$localEvolution    = "http://localhost:8080"
-$externalN8N       = "https://n8n.bearcavelabs.com.br"
-$externalEvolution = "https://evolution.bearcavelabs.com.br"
+$localN8N          = $LOCAL_N8N_URL
+$localEvolution    = $LOCAL_EVOLUTION_URL
+$externalN8N       = $EXTERNAL_N8N_URL
+$externalEvolution = $EXTERNAL_EVOLUTION_URL
 
 Start-Transcript -Path $logPath -Append
 Write-Host "=== INÍCIO DA EXECUÇÃO: $(Get-Date) ==="

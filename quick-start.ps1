@@ -7,8 +7,27 @@ param(
     [switch]$OpenBrowser = $false
 )
 
-$workingDir = "C:\Users\guii7\bear_cave_labs\n8n"
-$dockerDesktopPath = "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+# Carregar configurações do arquivo .env.scripts
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$envFile = Join-Path $scriptDir ".env.scripts"
+
+if (-not (Test-Path $envFile)) {
+    Write-Error "Arquivo de configuração não encontrado: $envFile"
+    Write-Error "Copie .env.scripts.example para .env.scripts e configure os valores."
+    exit 1
+}
+
+# Função para carregar variáveis do arquivo .env.scripts
+Get-Content $envFile | ForEach-Object {
+    if ($_ -match '^([^#=]+)=(.*)$') {
+        $name = $matches[1].Trim()
+        $value = $matches[2].Trim()
+        Set-Variable -Name $name -Value $value -Scope Script
+    }
+}
+
+$workingDir = $SCRIPTS_WORKING_DIR
+$dockerDesktopPath = $DOCKER_DESKTOP_PATH
 
 # Mudar para diretório
 try {
@@ -221,10 +240,10 @@ Write-Host "  • Kong (API):         http://localhost:8888"
 Write-Host "    └─ (API Gateway do Supabase)"
 Write-Host ""
 Write-Host "EXTERNOS (após propagação DNS):"
-Write-Host "  • N8N Principal:      https://n8n.bearcavelabs.com.br"
-Write-Host "  • Evolution API:      https://evolution.bearcavelabs.com.br"
-Write-Host "    ├─ Swagger Docs:    https://evolution.bearcavelabs.com.br/docs"
-Write-Host "    └─ Manager:         https://evolution.bearcavelabs.com.br/manager"
+Write-Host "  • N8N Principal:      $EXTERNAL_N8N_URL"
+Write-Host "  • Evolution API:      $EXTERNAL_EVOLUTION_URL"
+Write-Host "    ├─ Swagger Docs:    $EXTERNAL_EVOLUTION_URL/docs"
+Write-Host "    └─ Manager:         $EXTERNAL_EVOLUTION_URL/manager"
 
 # 7. Abrir browser (opcional)
 if ($OpenBrowser) {

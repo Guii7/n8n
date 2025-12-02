@@ -1,4 +1,4 @@
-# SCRIPT: manage-services-fixed.ps1
+# SCRIPT: manage-services.ps1
 # Script para gerenciar N8N + Evolution API + Cloudflare Tunnel facilmente
 
 param(
@@ -6,23 +6,42 @@ param(
     [ValidateSet("start", "stop", "restart", "status", "logs", "backup", "restore", "update", "tunnel", "help")]
     [string]$Action = "status",
 
-    [string]$Service = "all",  # all, n8n, evolution, postgres, redis, cloudflared, scraper, studio, kong, meta, rest, auth, storage, realtime, rabbitmq
+    [string]$Service = "all",
     [string]$BackupFile = "",
-    [switch]$Follow = $false,   # Para logs
-    [switch]$External = $false  # Para testar URLs externas
+    [switch]$Follow = $false,
+    [switch]$External = $false
 )
 
-$workingDir = "C:\Users\guii7\bear_cave_labs\n8n"
+# Carregar configurações do arquivo .env.scripts
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$envFile = Join-Path $scriptDir ".env.scripts"
+
+if (-not (Test-Path $envFile)) {
+    Write-Error "Arquivo de configuração não encontrado: $envFile"
+    Write-Error "Copie .env.scripts.example para .env.scripts e configure os valores."
+    exit 1
+}
+
+# Função para carregar variáveis do arquivo .env.scripts
+Get-Content $envFile | ForEach-Object {
+    if ($_ -match '^([^#=]+)=(.*)$') {
+        $name = $matches[1].Trim()
+        $value = $matches[2].Trim()
+        Set-Variable -Name $name -Value $value -Scope Script
+    }
+}
+
+$workingDir = $SCRIPTS_WORKING_DIR
 $backupDir = "$workingDir\backups"
 
 # URLs dos serviços
-$localN8N = "http://localhost:5678"
-$localEvolution = "http://localhost:8080"
-$localScraper = "http://localhost:5679"
-$localStudio = "http://localhost:3000"
-$localKong = "http://localhost:8888"
-$externalN8N = "https://n8n.bearcavelabs.com.br"
-$externalEvolution = "https://evolution.bearcavelabs.com.br"
+$localN8N = $LOCAL_N8N_URL
+$localEvolution = $LOCAL_EVOLUTION_URL
+$localScraper = $LOCAL_SCRAPER_URL
+$localStudio = $LOCAL_STUDIO_URL
+$localKong = $LOCAL_KONG_URL
+$externalN8N = $EXTERNAL_N8N_URL
+$externalEvolution = $EXTERNAL_EVOLUTION_URL
 
 # Mudar para diretório de trabalho
 try {
@@ -185,8 +204,6 @@ function Show-Status {
         $tunnelLogs = docker logs cloudflared_tunnel --tail 5 2>$null
         if ($tunnelLogs -match "Registered tunnel connection") {
             Write-Host "✓ Cloudflare Tunnel: Conectado"
-
-            # Contar conexões ativas
             $connections = ($tunnelLogs | Select-String "Registered tunnel connection").Count
             if ($connections -gt 0) {
                 Write-Host "  └─ Conexões ativas: $connections"
@@ -215,7 +232,6 @@ function Show-Status {
         Write-Host "✓ Evolution API: $localEvolution"
         Write-Host "  ├─ Docs: $localEvolution/docs"
         Write-Host "  └─ Manager: $localEvolution/manager"
-
         if ($evolutionResponse.version) {
             Write-Host "  └─ Version: $($evolutionResponse.version)"
         }
@@ -265,7 +281,6 @@ function Show-Status {
         Write-Host "=== SERVIÇOS EXTERNOS (via Cloudflare Tunnel) ==="
         Write-Host "NOTA: Pode falhar se DNS ainda não propagou"
 
-        # Testar N8N externo
         try {
             $externalN8NResponse = Invoke-RestMethod -Uri $externalN8N -TimeoutSec 10 -ErrorAction Stop
             Write-Host "✓ N8N Externo: $externalN8N"
@@ -277,7 +292,6 @@ function Show-Status {
             }
         }
 
-        # Testar Evolution API externo
         try {
             $externalEvolutionResponse = Invoke-RestMethod -Uri $externalEvolution -TimeoutSec 10 -ErrorAction Stop
             Write-Host "✓ Evolution API Externo: $externalEvolution"
@@ -348,7 +362,6 @@ function Show-TunnelInfo {
         return
     }
 
-    # Status do container
     Write-Host "Status do container:"
     try {
         $containerStatus = docker inspect cloudflared_tunnel --format '{{.State.Status}}' 2>$null
@@ -363,7 +376,6 @@ function Show-TunnelInfo {
         return
     }
 
-    # Logs recentes
     Write-Host ""
     Write-Host "Logs recentes do tunnel:"
     try {
@@ -373,7 +385,6 @@ function Show-TunnelInfo {
         Write-Host "  Erro ao obter logs"
     }
 
-    # Informações de conexão
     Write-Host ""
     Write-Host "Conexões ativas:"
     try {
@@ -382,10 +393,12 @@ function Show-TunnelInfo {
             $connectionCount = $connectionLogs.Count
             Write-Host "  Total de conexões registradas: $connectionCount"
 
-            # Mostrar últimas 3 conexões
             $connectionLogs | Select-Object -Last 3 | ForEach-Object {
                 if ($_ -match "connection=([a-f0-9-]+).*location=(\w+).*protocol=(\w+)") {
-                    Write-Host "  └─ Conexão: $($matches[1].Substring(0,8))... | Local: $($matches[2]) | Protocolo: $($matches[3])"
+                    $connId = $matches[1].Substring(0,8)
+                    $loc = $matches[2]
+                    $proto = $matches[3]
+                    Write-Host "  └─ Conexão: $connId... | Local: $loc | Protocolo: $proto"
                 }
             }
         } else {
@@ -395,15 +408,16 @@ function Show-TunnelInfo {
         Write-Host "  Erro ao analisar conexões"
     }
 
-    # Configuração atual
     Write-Host ""
     Write-Host "Configuração de rotas:"
     try {
         $configLogs = docker logs cloudflared_tunnel 2>$null | Select-String "Updated to new configuration" | Select-Object -Last 1
         if ($configLogs) {
             if ($configLogs -match '"ingress":\[.*?\]') {
-                Write-Host "  N8N: n8n.bearcavelabs.com.br → http://n8n:5678"
-                Write-Host "  Evolution: evolution.bearcavelabs.com.br → http://evolution-api:8080"
+                $n8nHost = ($externalN8N -replace 'https?://', '')
+                $evolutionHost = ($externalEvolution -replace 'https?://', '')
+                Write-Host "  N8N: $n8nHost → http://n8n:5678"
+                Write-Host "  Evolution: $evolutionHost → http://evolution-api:8080"
             }
         }
     } catch {
@@ -429,7 +443,6 @@ function New-Backup {
     $timestamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
     $backupFileName = "integrated_backup_$timestamp.tar.gz"
 
-    # Parar containers para backup consistente
     Write-Host "Parando containers temporariamente..."
     try {
         docker-compose down
@@ -437,7 +450,6 @@ function New-Backup {
         Write-Warning "Erro ao parar containers, continuando..."
     }
 
-    # Criar diretório de backup
     if (-not (Test-Path $backupDir)) {
         try {
             New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
@@ -447,7 +459,6 @@ function New-Backup {
         }
     }
 
-    # Fazer backup (volumes atualizados - removido n8n_scraper_data, adicionado rabbitmq e puppeteer)
     try {
         docker run --rm `
             --volume n8n_n8n_data:/n8n `
@@ -463,7 +474,7 @@ function New-Backup {
             $backupPath = "$backupDir\$backupFileName"
             if (Test-Path $backupPath) {
                 $backupSize = [math]::Round((Get-Item $backupPath).Length / 1MB, 2)
-                Write-Host "Backup criado: $backupFileName ($backupSize MB)"
+                Write-Host ("Backup criado: {0} ({1} MB)" -f $backupFileName, $backupSize)
             } else {
                 Write-Warning "Arquivo de backup não encontrado após criação"
             }
@@ -471,13 +482,11 @@ function New-Backup {
             Write-Error "Falha na criação do backup"
         }
 
-        # Reiniciar serviços
         Write-Host "Reiniciando serviços..."
         docker-compose up -d
 
     } catch {
         Write-Error "Erro no backup: $($_.Exception.Message)"
-        # Tentar reiniciar mesmo com erro
         try {
             docker-compose up -d
         } catch {
@@ -512,7 +521,6 @@ function Restore-Backup {
 
     Write-Host "Restaurando backup: $BackupFile"
 
-    # Parar serviços
     try {
         docker-compose down
     } catch {
@@ -520,7 +528,6 @@ function Restore-Backup {
     }
 
     try {
-        # Restaurar backup (volumes atualizados - removido n8n_scraper_data, adicionado rabbitmq e puppeteer)
         docker run --rm `
             --volume n8n_n8n_data:/n8n `
             --volume n8n_postgres_data:/postgres `
@@ -537,7 +544,6 @@ function Restore-Backup {
             Write-Error "Falha na restauração do backup"
         }
 
-        # Reiniciar serviços
         Write-Host "Iniciando serviços..."
         docker-compose up -d
         Start-Sleep -Seconds 20

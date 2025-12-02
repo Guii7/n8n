@@ -54,7 +54,9 @@ task_log.txt
 
 backups/
 workflows/
-python_scraper/
+python_scraper_meli/
+python_scraper_amazon/
+supabase/
 meli_login/
 
 # Documentação local com credenciais (não committar)
@@ -64,6 +66,7 @@ SUPABASE_*.md
 .env
 .env.bkp
 .env.scraper
+.env.scripts
 task_log.txt
 
 # Ignora arquivos de backup e logs
