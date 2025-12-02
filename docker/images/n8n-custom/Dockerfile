@@ -1,5 +1,5 @@
 # Usa a imagem oficial do N8N como base
-FROM n8nio/n8n:1.119.0
+FROM n8nio/n8n:latest
 
 USER root
 
