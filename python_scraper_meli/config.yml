@@ -1,0 +1,16 @@
+# Cloudflare Tunnel Configuration
+# Tunnel: BearCaveLabs
+# UUID: 17efc78f-1abc-4b45-aa09-5b0decdba99f
+
+tunnel: 17efc78f-1abc-4b45-aa09-5b0decdba99f
+credentials-file: C:\Users\guii7\.cloudflared\17efc78f-1abc-4b45-aa09-5b0decdba99f.json
+
+ingress:
+  # Mercado Livre Scraper API
+  # IMPORTANTE: Substitua <SUBDOMINIO> e <SEU-DOMINIO> pelos seus dados
+  # Exemplo: ml-api.meudominio.com
+  - hostname: ml-api.bearcavelabs.com.br
+    service: http://localhost:5000
+
+  # Catch-all rule (obrigatório - sempre por último)
+  - service: http_status:404

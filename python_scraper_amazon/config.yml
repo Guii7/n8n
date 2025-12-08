@@ -1,0 +1,206 @@
+# ============================================
+# Amazon Scraper - Configuração de URLs
+# ============================================
+
+scraping_configs:
+  # ============================================
+  # OFERTAS GERAIS (sem categoria específica)
+  # ============================================
+
+  - name: "Ofertas do Dia"
+    url: "https://www.amazon.com.br/deals"
+    type: "deal"
+    max_offers: 100
+    enabled: true
+    description: "Ofertas do dia da Amazon"
+
+  - name: "Ofertas em Destaque"
+    url: "https://www.amazon.com.br/b?node=206210464011&pd_rd_w=cWqtz&content-id=amzn1.sym.e1728759-0b92-489c-ba4d-9b93a592a091&pf_rd_p=e1728759-0b92-489c-ba4d-9b93a592a091&pf_rd_r=1XF7A2NWPK11XRY4NDBX&pd_rd_wg=3m1Pb&pd_rd_r=e2ee51d5-20c1-4c7d-93c1-43b4f0688c3c"
+    type: "deal"
+    max_offers: 100
+    enabled: true
+    description: "Ofertas em destaque"
+
+  # ============================================
+  # CATEGORIAS - BEST SELLERS
+  # ============================================
+
+  - name: "Best Sellers - Casa e Cozinha"
+    url: "https://www.amazon.com.br/gp/bestsellers/kitchen"
+    type: "bestseller"
+    category: "Casa"
+    max_offers: 50
+    enabled: true
+    description: "Mais vendidos em Casa e Cozinha"
+
+  - name: "Best Sellers - Eletrodomésticos"
+    url: "https://www.amazon.com.br/gp/bestsellers/appliances"
+    type: "bestseller"
+    category: "Eletro"
+    max_offers: 50
+    enabled: true
+    description: "Mais vendidos em Eletrodomésticos"
+
+  - name: "Best Sellers - Moda"
+    url: "https://www.amazon.com.br/gp/bestsellers/fashion"
+    type: "bestseller"
+    category: "Moda"
+    max_offers: 50
+    enabled: true
+    description: "Mais vendidos em Moda"
+
+  - name: "Best Sellers - Supermercado"
+    url: "https://www.amazon.com.br/gp/bestsellers/grocery"
+    type: "bestseller"
+    category: "Mercado"
+    max_offers: 50
+    enabled: true
+    description: "Mais vendidos em Supermercado"
+
+  - name: "Best Sellers - Ferramentas"
+    url: "https://www.amazon.com.br/gp/bestsellers/hi"
+    type: "bestseller"
+    category: "Ferramentas"
+    max_offers: 50
+    enabled: true
+    description: "Mais vendidos em Ferramentas e Construção"
+
+  - name: "Best Sellers - Esportes"
+    url: "https://www.amazon.com.br/gp/bestsellers/sports"
+    type: "bestseller"
+    category: "Esporte"
+    max_offers: 50
+    enabled: true
+    description: "Mais vendidos em Esporte e Lazer"
+
+  - name: "Best Sellers - Saúde"
+    url: "https://www.amazon.com.br/gp/bestsellers/hpc"
+    type: "bestseller"
+    category: "Saude"
+    max_offers: 50
+    enabled: true
+    description: "Mais vendidos em Saúde, Higiene e Bem-Estar"
+
+  - name: "Best Sellers - Eletrônicos"
+    url: "https://www.amazon.com.br/gp/bestsellers/electronics"
+    type: "bestseller"
+    category: "Eletronicos"
+    max_offers: 50
+    enabled: true
+    description: "Mais vendidos em Eletrônicos"
+
+  - name: "Best Sellers - Informática"
+    url: "https://www.amazon.com.br/gp/bestsellers/computers"
+    type: "bestseller"
+    category: "Informatica"
+    max_offers: 50
+    enabled: true
+    description: "Mais vendidos em Computadores e Informática"
+
+  - name: "Best Sellers - Games"
+    url: "https://www.amazon.com.br/gp/bestsellers/videogames"
+    type: "bestseller"
+    category: "Games"
+    max_offers: 50
+    enabled: true
+    description: "Mais vendidos em Videogames"
+
+  # ============================================
+  # DESATIVADAS (para referência futura)
+  # ============================================
+
+  - name: "Black Friday Amazon"
+    url: "https://www.amazon.com.br/blackfriday"
+    type: "product"
+    max_offers: 450
+    enabled: false  # Desativado - só ativar em época de Black Friday
+    description: "Ofertas da Black Friday"
+
+# ============================================
+# Configurações de Scraping
+# ============================================
+scraping_settings:
+  # Seletores CSS para elementos da página
+  selectors:
+    # ============================================
+    # Seletores para página Black Friday
+    # ============================================
+    # Container principal de produtos (cards de produto)
+    product_container: "div[data-testid='product-card']"
+
+    # Informações do produto - Black Friday
+    product_title: "p[id^='title-'] span.a-truncate-full"
+    product_link: "a[data-testid='product-card-link']"
+    product_image: "img.ProductCardImage-module__image_SU6C7KYJpko3vQ2fK7Kf, img[alt]"
+    product_price: "span.a-price span.a-offscreen"
+    product_original_price: "span.a-price.a-text-price span.a-offscreen"
+    product_rating: "span.a-icon-alt"
+    product_reviews: "span.a-size-base"
+
+    # Badges e informações adicionais
+    prime_badge: "i.a-icon-prime"
+    coupon_badge: "span.s-coupon-unclipped"
+    discount_badge: "div[data-component='dui-badge'] span.a-size-mini"
+
+    # Página do produto individual
+    detail_asin: "input#ASIN"
+    detail_category: "a.a-link-normal.a-color-tertiary"
+    detail_shipping: "div#mir-layout-DELIVERY_BLOCK"
+
+    # SiteStripe (barra de ferramentas de afiliados)
+    sitestripe_container: "#amzn-ss-text-link"
+    sitestripe_link_input: "#amzn-ss-text-shortlink-textarea"
+    sitestripe_image_link: "#amzn-ss-image-link"
+    sitestripe_text_link: "#amzn-ss-text-link"
+
+  # Configurações de navegação
+  navigation:
+    wait_for_network_idle: true
+    scroll_to_bottom: true
+    scroll_delay: 500  # ms entre scrolls (mais rápido)
+    max_scroll_attempts: 10  # mais scrolls para carregar todos produtos
+
+  # Delays (em segundos)
+  delays:
+    between_products: 1  # reduzido
+    between_pages: 3
+    after_login: 3
+    sitestripe_load: 2
+
+  # Timeouts (em milissegundos)
+  timeouts:
+    page_load: 30000
+    element_wait: 10000
+    sitestripe_wait: 5000
+
+# ============================================
+# Configurações de Banco de Dados
+# ============================================
+database:
+  # Lógica de atualização
+  update_logic:
+    # Renviar oferta se preço mudou
+    resend_on_price_change: true
+
+    # Renviar oferta se passou X dias desde último envio
+    resend_after_days: 5
+
+    # Salvar apenas ofertas com link de afiliado válido
+    require_affiliate_link: true
+
+# ============================================
+# Configurações de Logging
+# ============================================
+logging:
+  # Salvar screenshots em caso de erro
+  save_error_screenshots: true
+  screenshot_dir: "screenshots"
+
+  # Salvar HTML das páginas para debug
+  save_debug_html: false
+  debug_html_dir: "debug_html"
+
+  # Nível de detalhe nos logs
+  # DEBUG, INFO, WARNING, ERROR
+  console_level: "INFO"
+  file_level: "DEBUG"
