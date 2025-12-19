@@ -53,11 +53,15 @@ packages/cli/src/commands/export/outputs
 task_log.txt
 
 backups/
+
+# MCP Configuration - contains sensitive tokens
+mcp-config.json
 workflows/
 python_scraper_meli/
 python_scraper_amazon/
 supabase/
 meli_login/
+n8n-mcp.json
 
 # Documentação local com credenciais (não committar)
 .docs-local/
@@ -78,3 +82,12 @@ puppeteer_session/
 
 # Ignora arquivos de build e cache
 n8n-scraper-custom/node_modules
+
+# Ignora todas as pastas de scraper
+python_scraper*/
+*_scraper/
+scraper/
+
+# Ignora documentação local
+docs/
+.docs/

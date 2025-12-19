@@ -3,7 +3,11 @@ FROM n8nio/n8n:latest
 
 USER root
 
-# Instala o Chromium e dependências necessárias para o Puppeteer
+# Adiciona repositório Edge do Alpine para FFmpeg 8.0.1
+RUN echo "https://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositories && \
+    echo "https://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories
+
+# Instala o Chromium, FFmpeg 8.0.1 e dependências necessárias para o Puppeteer
 RUN apk add --no-cache \
     chromium \
     nss \
@@ -12,7 +16,8 @@ RUN apk add --no-cache \
     ca-certificates \
     ttf-freefont \
     nodejs \
-    yarn
+    yarn \
+    ffmpeg
 
 # Define a variável de ambiente para o Puppeteer usar o Chromium instalado
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
