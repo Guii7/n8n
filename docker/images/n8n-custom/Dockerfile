@@ -40,6 +40,11 @@ RUN ln -sf /usr/local/lib/node_modules_external/node_modules/puppeteer /usr/loca
 # Adiciona o diretório de módulos externos ao NODE_PATH
 ENV NODE_PATH=/usr/local/lib/node_modules_external/node_modules:/usr/local/lib/node_modules
 
+# Cria diretório para vídeos temporários com permissões adequadas
+RUN mkdir -p /home/node/n8n_videos && \
+    chown -R node:node /home/node/n8n_videos && \
+    chmod -R 777 /home/node/n8n_videos
+
 # Volta para o usuário padrão do N8N
 WORKDIR /home/node
 USER node

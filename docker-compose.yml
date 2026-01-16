@@ -75,13 +75,21 @@ services:
     environment:
       # Permite o uso de módulos externos (Puppeteer)
       - NODE_FUNCTION_ALLOW_EXTERNAL=puppeteer,puppeteer-extra,puppeteer-extra-plugin-stealth
+      # Permite o uso de módulos built-in (fs, path, etc)
+      - NODE_FUNCTION_ALLOW_BUILTIN=fs,path,buffer
+      # Desabilitar Task Runner para permitir fs no Code node
+      - N8N_RUNNERS_DISABLED=true
       # Configurações do Puppeteer
       - PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
       - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+      # Habilita todos os nós (incluindo Execute Command)
+      - NODES_EXCLUDE=[]
     volumes:
       - n8n_data:/files
       # Volume para sessões do Puppeteer (se necessário)
       - ./puppeteer_session:/home/node/.puppeteer_session
+    tmpfs:
+      - /tmp:size=2G,mode=1777
     networks:
       - n8n_network
       - bearcave_shared
