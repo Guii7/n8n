@@ -1,52 +1,45 @@
-# Usa a imagem oficial do N8N como base
+# Usa a imagem oficial do N8N 2.3.6+ como base
 FROM n8nio/n8n:latest
 
+# Adiciona permissões de root temporariamente para instalar dependências
 USER root
 
-# Adiciona repositório Edge do Alpine para FFmpeg 8.0.1
-RUN echo "https://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositories && \
-    echo "https://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories
+# Baixar FFmpeg estático (binários compilados estaticamente, sem dependências)
+RUN wget -O /tmp/ffmpeg.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz && \
+    mkdir -p /tmp/ffmpeg && \
+    tar -xf /tmp/ffmpeg.tar.xz -C /tmp/ffmpeg --strip-components=1 && \
+    mv /tmp/ffmpeg/ffmpeg /usr/local/bin/ffmpeg && \
+    mv /tmp/ffmpeg/ffprobe /usr/local/bin/ffprobe && \
+    chmod +x /usr/local/bin/ffmpeg /usr/local/bin/ffprobe && \
+    rm -rf /tmp/ffmpeg /tmp/ffmpeg.tar.xz
 
-# Instala o Chromium, FFmpeg 8.0.1 e dependências necessárias para o Puppeteer
-RUN apk add --no-cache \
-    chromium \
-    nss \
-    freetype \
-    harfbuzz \
-    ca-certificates \
-    ttf-freefont \
-    nodejs \
-    yarn \
-    ffmpeg
+# Cria diretório para Puppeteer e dá permissão ao node user
+RUN mkdir -p /home/node/node_modules_external && \
+    chown -R node:node /home/node/node_modules_external
 
-# Define a variável de ambiente para o Puppeteer usar o Chromium instalado
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
-
-# Cria diretório customizado para módulos externos e instala Puppeteer lá
-RUN mkdir -p /usr/local/lib/node_modules_external && \
-    cd /usr/local/lib/node_modules_external && \
+# Volta para usuario node e instala Puppeteer
+USER node
+RUN cd /home/node/node_modules_external && \
     npm init -y && \
     npm install --save \
         puppeteer@22.0.0 \
         puppeteer-extra@3.3.6 \
         puppeteer-extra-plugin-stealth@2.11.2
 
-# Cria symlinks para que o vm2 encontre os módulos
-RUN ln -sf /usr/local/lib/node_modules_external/node_modules/puppeteer /usr/local/lib/node_modules/puppeteer && \
-    ln -sf /usr/local/lib/node_modules_external/node_modules/puppeteer-extra /usr/local/lib/node_modules/puppeteer-extra && \
-    ln -sf /usr/local/lib/node_modules_external/node_modules/puppeteer-extra-plugin-stealth /usr/local/lib/node_modules/puppeteer-extra-plugin-stealth
+# Define NODE_PATH para Puppeteer
+ENV NODE_PATH=/home/node/node_modules_external/node_modules:/home/node/.node_modules
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
-# Adiciona o diretório de módulos externos ao NODE_PATH
-ENV NODE_PATH=/usr/local/lib/node_modules_external/node_modules:/usr/local/lib/node_modules
-
-# Cria diretório para vídeos temporários com permissões adequadas
+# Volta para root para criar diretório de vídeos
+USER root
 RUN mkdir -p /home/node/n8n_videos && \
     chown -R node:node /home/node/n8n_videos && \
     chmod -R 777 /home/node/n8n_videos
 
-# Volta para o usuário padrão do N8N
+# Define workdir
 WORKDIR /home/node
+
+# Volta para o usuário padrão do N8N
 USER node
 
 # Define o diretório de trabalho

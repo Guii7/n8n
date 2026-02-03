@@ -88,6 +88,8 @@ services:
       - n8n_data:/files
       # Volume para sessões do Puppeteer (se necessário)
       - ./puppeteer_session:/home/node/.puppeteer_session
+      # Volume para avatares e vídeos de template (persistente)
+      - ./avatars:/home/node/n8n_videos/avatars:ro
     tmpfs:
       - /tmp:size=2G,mode=1777
     networks:
@@ -107,6 +109,12 @@ services:
       - "8080:8080"
     env_file:
       - .env
+    environment:
+      # Força Node.js a usar IPv4 (resolve erro ENETUNREACH com CDN Amazon/Akamai)
+      - NODE_OPTIONS=--dns-result-order=ipv4first
+    sysctls:
+      # Desabilita IPv6 no container (solução definitiva para ENETUNREACH)
+      - net.ipv6.conf.all.disable_ipv6=1
     volumes:
       - evolution_instances:/evolution/instances
     networks:
