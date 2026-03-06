@@ -1,4 +1,4 @@
-# Script de Verificação de Saúde - Evolution API
+﻿# Script de Verificação de Saúde - Evolution API
 # Bear Cave Labs - 11/11/2025
 
 # Carregar configurações do arquivo .env.scripts
@@ -189,7 +189,7 @@ $onlineServices = @($evolutionOk, $redisOk, $rabbitmqOk, $postgresOk, $n8nOk) | 
 
 $healthPercentage = [math]::Round(($onlineServices / $totalServices) * 100, 2)
 
-Write-Host "Serviços Online: $onlineServices/$totalServices ($healthPercentage%)" -ForegroundColor White
+Write-Host ("Serviços Online: {0}/{1} ({2}%)" -f $onlineServices, $totalServices, $healthPercentage) -ForegroundColor White
 
 if ($healthPercentage -eq 100) {
     Write-Host ""

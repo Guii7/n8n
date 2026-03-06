@@ -8,6 +8,8 @@ services:
     restart: unless-stopped
     ports:
       - "5432:5432"
+    environment:
+      - TZ=America/Sao_Paulo
     env_file:
       - .env
     volumes:
@@ -34,6 +36,8 @@ services:
     container_name: evolution_redis
     restart: unless-stopped
     command: redis-server --port 6379 --appendonly yes
+    environment:
+      - TZ=America/Sao_Paulo
     volumes:
       - evolution_redis:/data
     networks:
@@ -50,6 +54,7 @@ services:
       - "5672:5672"
       - "15672:15672"
     environment:
+      - TZ=America/Sao_Paulo
       - RABBITMQ_DEFAULT_USER=user
       - RABBITMQ_DEFAULT_PASS=password
       - RABBITMQ_NODENAME=rabbit@rabbitmq-node1
@@ -73,6 +78,8 @@ services:
     env_file:
       - .env
     environment:
+      # Configuração de Timezone
+      - TZ=America/Sao_Paulo
       # Permite o uso de módulos externos (Puppeteer)
       - NODE_FUNCTION_ALLOW_EXTERNAL=puppeteer,puppeteer-extra,puppeteer-extra-plugin-stealth
       # Permite o uso de módulos built-in (fs, path, etc)
@@ -110,6 +117,8 @@ services:
     env_file:
       - .env
     environment:
+      # Configuração de Timezone
+      - TZ=America/Sao_Paulo
       # Força Node.js a usar IPv4 (resolve erro ENETUNREACH com CDN Amazon/Akamai)
       - NODE_OPTIONS=--dns-result-order=ipv4first
     sysctls:
@@ -137,6 +146,66 @@ services:
     depends_on:
       - n8n
       - evolution-api
+
+  # ---------------------------------------------------
+  # TYPEBOT SERVICES
+  # ---------------------------------------------------
+  typebot-builder:
+    image: baptistearno/typebot-builder:latest
+    container_name: typebot_builder
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - TZ=America/Sao_Paulo
+      - HOSTNAME=0.0.0.0
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=${DATABASE_URL}
+      - ENCRYPTION_SECRET=${ENCRYPTION_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXT_PUBLIC_VIEWER_URL=${NEXT_PUBLIC_VIEWER_URL}
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+      - DISABLE_TELEMETRY=${DISABLE_TELEMETRY}
+    env_file:
+      - .env
+    networks:
+      - n8n_network
+      - bearcave_shared
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  typebot-viewer:
+    image: baptistearno/typebot-viewer:latest
+    container_name: typebot_viewer
+    restart: unless-stopped
+    ports:
+      - "3002:3000"
+    environment:
+      - TZ=America/Sao_Paulo
+      - HOSTNAME=0.0.0.0
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=${DATABASE_URL}
+      - ENCRYPTION_SECRET=${ENCRYPTION_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXT_PUBLIC_VIEWER_URL=${NEXT_PUBLIC_VIEWER_URL}
+      - DISABLE_TELEMETRY=${DISABLE_TELEMETRY}
+    env_file:
+      - .env
+    networks:
+      - n8n_network
+      - bearcave_shared
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
 volumes:
   n8n_data:

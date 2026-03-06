@@ -19,16 +19,16 @@ RUN mkdir -p /home/node/node_modules_external && \
 
 # Volta para usuario node e instala Puppeteer
 USER node
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 RUN cd /home/node/node_modules_external && \
     npm init -y && \
     npm install --save \
-        puppeteer@22.0.0 \
-        puppeteer-extra@3.3.6 \
-        puppeteer-extra-plugin-stealth@2.11.2
+    puppeteer@24.38.0 \
+    puppeteer-extra@3.3.6 \
+    puppeteer-extra-plugin-stealth@2.11.2
 
 # Define NODE_PATH para Puppeteer
 ENV NODE_PATH=/home/node/node_modules_external/node_modules:/home/node/.node_modules
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
 # Volta para root para criar diretório de vídeos
 USER root

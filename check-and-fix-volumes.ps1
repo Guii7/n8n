@@ -1,4 +1,4 @@
-# SCRIPT: check-and-fix-volumes-fixed.ps1
+﻿# SCRIPT: check-and-fix-volumes-fixed.ps1
 # Verifica e corrige problemas com volumes Docker (CORRIGIDO para nova configuração)
 
 param(
@@ -147,21 +147,6 @@ if ($LASTEXITCODE -eq 0) {
 }
 
 Write-Host ""
-Write-Host "   N8N Scraper Volume (n8n_n8n_scraper_data):"
-docker run --rm -v "n8n_n8n_scraper_data:/data" alpine ls -la /data 2>$null
-if ($LASTEXITCODE -eq 0) {
-    Write-Host "   ✓ N8N Scraper volume acessível"
-    $scraperFiles = docker run --rm -v "n8n_n8n_scraper_data:/data" alpine find /data -name "*.json" -o -name "*.db*" 2>$null
-    if ($scraperFiles) {
-        $scraperFileCount = ($scraperFiles | Measure-Object).Count
-        Write-Host "   └─ $scraperFileCount arquivos de dados encontrados"
-    } else {
-        Write-Host "   └─ Volume vazio (normal para novo N8N Scraper)"
-    }
-} else {
-    Write-Host "   ✗ Não foi possível acessar volume N8N Scraper"
-}
-
 Write-Host ""
 Write-Host "5. VERIFICAÇÃO DE CONECTIVIDADE DOS CONTAINERS:"
 
@@ -171,7 +156,6 @@ $containerVolumeMap = @{
     "n8n_postgres_db" = "n8n_postgres_data"
     "evolution_redis" = "n8n_evolution_redis"
     "evolution_api" = "n8n_evolution_instances"
-    "n8n_scraper" = "n8n_n8n_scraper_data"
 }
 
 foreach ($container in $containerVolumeMap.GetEnumerator()) {
@@ -276,7 +260,6 @@ Write-Host "- n8n_n8n_data: Dados do N8N principal (workflows, credenciais)"
 Write-Host "- n8n_postgres_data: Base de dados PostgreSQL (compartilhada)"
 Write-Host "- n8n_evolution_redis: Cache Redis para Evolution API"
 Write-Host "- n8n_evolution_instances: Instâncias do WhatsApp (Evolution API)"
-Write-Host "- n8n_n8n_scraper_data: Dados do N8N Scraper (isolado)"
 Write-Host ""
 Write-Host "DICAS:"
 Write-Host "- Volumes vazios são normais em primeira execução"

@@ -1,4 +1,4 @@
-# SCRIPT: manage-services.ps1
+﻿# SCRIPT: manage-services.ps1
 # Script para gerenciar N8N + Evolution API + Cloudflare Tunnel facilmente
 
 param(
@@ -37,9 +37,6 @@ $backupDir = "$workingDir\backups"
 # URLs dos serviços
 $localN8N = $LOCAL_N8N_URL
 $localEvolution = $LOCAL_EVOLUTION_URL
-$localScraper = $LOCAL_SCRAPER_URL
-$localStudio = $LOCAL_STUDIO_URL
-$localKong = $LOCAL_KONG_URL
 $externalN8N = $EXTERNAL_N8N_URL
 $externalEvolution = $EXTERNAL_EVOLUTION_URL
 
@@ -53,7 +50,7 @@ try {
 
 function Show-Help {
     Write-Host @"
-=== GERENCIADOR DE SERVIÇOS N8N + EVOLUTION API + SUPABASE + CLOUDFLARE TUNNEL ===
+=== GERENCIADOR DE SERVIÇOS N8N + EVOLUTION API + CLOUDFLARE TUNNEL ===
 
 USO: .\manage-services.ps1 [AÇÃO] [OPÇÕES]
 
@@ -71,7 +68,7 @@ AÇÕES:
 
 OPÇÕES:
   -Service    - Serviço específico: all, n8n, evolution, postgres, redis, cloudflared,
-                scraper, studio, kong, meta, rest, auth, storage, realtime, rabbitmq
+                                rabbitmq
   -Follow     - Seguir logs em tempo real (usar com logs)
   -External   - Testar URLs externas também (usar com status)
   -BackupFile - Arquivo de backup para restaurar
@@ -79,8 +76,8 @@ OPÇÕES:
 EXEMPLOS:
   .\manage-services.ps1 start
   .\manage-services.ps1 status -External
-  .\manage-services.ps1 logs -Service studio -Follow
-  .\manage-services.ps1 logs -Service kong
+    .\manage-services.ps1 logs -Service rabbitmq -Follow
+    .\manage-services.ps1 logs -Service n8n
   .\manage-services.ps1 tunnel
   .\manage-services.ps1 restore -BackupFile "integrated_backup_2025-01-01_12-00-00.tar.gz"
 
@@ -91,14 +88,6 @@ SERVIÇOS DISPONÍVEIS:
   - redis: Redis (cache Evolution)
   - rabbitmq: RabbitMQ (mensageria)
   - cloudflared: Cloudflare Tunnel
-  - scraper: N8N Scraper
-  - studio: Supabase Studio (UI)
-  - kong: Kong API Gateway
-  - meta: Supabase Postgres Meta
-  - rest: PostgREST (REST API)
-  - auth: Supabase Auth (GoTrue)
-  - storage: Supabase Storage
-  - realtime: Supabase Realtime
 "@
 }
 
@@ -239,34 +228,6 @@ function Show-Status {
         Write-Host "✗ Evolution API: Não acessível"
     }
 
-    # Verificar N8N Scraper
-    try {
-        $scraperResponse = Invoke-RestMethod -Uri $localScraper -TimeoutSec 5 -ErrorAction Stop
-        Write-Host "✓ N8N Scraper: $localScraper"
-    } catch {
-        Write-Host "✗ N8N Scraper: Não acessível"
-    }
-
-    # Verificar Supabase Studio
-    try {
-        $studioResponse = Invoke-RestMethod -Uri $localStudio -TimeoutSec 5 -ErrorAction Stop
-        Write-Host "✓ Supabase Studio: $localStudio"
-        Write-Host "  └─ Interface de gerenciamento do banco de dados"
-    } catch {
-        Write-Host "✗ Supabase Studio: Não acessível"
-    }
-
-    # Verificar Kong API Gateway
-    try {
-        $kongResponse = Invoke-RestMethod -Uri $localKong -TimeoutSec 5 -ErrorAction Stop
-        Write-Host "✓ Kong (API Gateway): $localKong"
-        Write-Host "  ├─ Meta API: $localKong/pg"
-        Write-Host "  ├─ REST API: $localKong/rest/v1"
-        Write-Host "  └─ Auth API: $localKong/auth/v1"
-    } catch {
-        Write-Host "✗ Kong: Não acessível"
-    }
-
     # Verificar RabbitMQ
     try {
         $rabbitResponse = Invoke-RestMethod -Uri "http://localhost:15672" -TimeoutSec 5 -ErrorAction Stop
@@ -318,14 +279,6 @@ function Show-Logs {
         "postgres" = "n8n_postgres_db"
         "redis" = "evolution_redis"
         "cloudflared" = "cloudflared_tunnel"
-        "scraper" = "n8n_scraper"
-        "studio" = "supabase_studio"
-        "kong" = "supabase_kong"
-        "meta" = "supabase_meta"
-        "rest" = "supabase_rest"
-        "auth" = "supabase_auth"
-        "storage" = "supabase_storage"
-        "realtime" = "supabase_realtime"
         "rabbitmq" = "evolution_rabbitmq"
     }
 

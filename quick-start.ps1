@@ -1,4 +1,4 @@
-# SCRIPT: quick-start.ps1
+﻿# SCRIPT: quick-start.ps1
 # Script simplificado para iniciar rapidamente todos os serviços
 
 param(
@@ -191,37 +191,6 @@ if ($ShowStatus) {
         Write-Host "   ⚠ Evolution API: Iniciando... (http://localhost:8080)"
     }
 
-    # N8N Scraper
-    try {
-        $scraperResponse = Invoke-RestMethod -Uri "http://localhost:5679" -TimeoutSec 8 -ErrorAction Stop
-        Write-Host "   ✓ N8N Scraper: Acessível (http://localhost:5679)"
-    } catch {
-        Write-Host "   ⚠ N8N Scraper: Iniciando... (http://localhost:5679)"
-    }
-
-    # Supabase Studio
-    try {
-        $studioResponse = Invoke-RestMethod -Uri "http://localhost:3000" -TimeoutSec 8 -ErrorAction Stop
-        Write-Host "   ✓ Supabase Studio: Acessível (http://localhost:3000)"
-    } catch {
-        Write-Host "   ⚠ Supabase Studio: Iniciando... (http://localhost:3000)"
-    }
-
-    # Kong API Gateway
-    try {
-        $kongResponse = Invoke-RestMethod -Uri "http://localhost:8888" -TimeoutSec 8 -ErrorAction Stop
-        Write-Host "   ✓ Kong (API Gateway): Acessível (http://localhost:8888)"
-    } catch {
-        Write-Host "   ⚠ Kong: Iniciando... (http://localhost:8888)"
-    }
-
-    # Postgres Meta (via Kong)
-    try {
-        $metaResponse = Invoke-RestMethod -Uri "http://localhost:8888/pg" -TimeoutSec 8 -ErrorAction Stop
-        Write-Host "   ✓ Postgres Meta: Acessível (via Kong /pg)"
-    } catch {
-        Write-Host "   ⚠ Postgres Meta: Iniciando..."
-    }
 }
 
 # 6. URLs finais
@@ -233,11 +202,6 @@ Write-Host "  • N8N Principal:      http://localhost:5678"
 Write-Host "  • Evolution API:      http://localhost:8080"
 Write-Host "    ├─ Swagger Docs:    http://localhost:8080/docs"
 Write-Host "    └─ Manager:         http://localhost:8080/manager"
-Write-Host "  • N8N Scraper:        http://localhost:5679"
-Write-Host "  • Supabase Studio:    http://localhost:3000"
-Write-Host "    └─ (Gerenciamento do banco de dados)"
-Write-Host "  • Kong (API):         http://localhost:8888"
-Write-Host "    └─ (API Gateway do Supabase)"
 Write-Host ""
 Write-Host "EXTERNOS (após propagação DNS):"
 Write-Host "  • N8N Principal:      $EXTERNAL_N8N_URL"
@@ -253,10 +217,6 @@ if ($OpenBrowser) {
         Start-Process "http://localhost:5678"        # N8N
         Start-Sleep -Seconds 2
         Start-Process "http://localhost:8080/docs"   # Evolution API Docs
-        Start-Sleep -Seconds 2
-        Start-Process "http://localhost:5679"        # N8N Scraper
-        Start-Sleep -Seconds 2
-        Start-Process "http://localhost:3000"        # Supabase Studio
     } catch {
         Write-Warning "Erro ao abrir navegador: $($_.Exception.Message)"
     }
