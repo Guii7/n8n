@@ -1,4 +1,4 @@
-# Usa a imagem oficial do N8N 2.3.6+ como base
+# Usa a imagem oficial do N8N latest como base (validado operacionalmente em 2.14.2)
 FROM n8nio/n8n:latest
 
 # Adiciona permissões de root temporariamente para instalar dependências

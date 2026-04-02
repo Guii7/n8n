@@ -121,6 +121,8 @@ services:
       - TZ=America/Sao_Paulo
       # Força Node.js a usar IPv4 (resolve erro ENETUNREACH com CDN Amazon/Akamai)
       - NODE_OPTIONS=--dns-result-order=ipv4first
+      # Workaround para bug no Typebot (v. 2.3.7)
+      - SEND_BUTTONS_AS_POLL=true
     sysctls:
       # Desabilita IPv6 no container (solução definitiva para ENETUNREACH)
       - net.ipv6.conf.all.disable_ipv6=1
