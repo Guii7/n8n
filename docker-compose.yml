@@ -91,6 +91,7 @@ services:
       - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
       # Habilita todos os nós (incluindo Execute Command)
       - NODES_EXCLUDE=[]
+      - WEBHOOK_URL=${WEBHOOK_URL}
     volumes:
       - n8n_data:/files
       # Volume para sessões do Puppeteer (se necessário)
