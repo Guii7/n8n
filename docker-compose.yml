@@ -109,6 +109,39 @@ services:
       redis:
         condition: service_started
 
+  magalu-scraper:
+    build:
+      context: ./python_scraper_magalu
+      dockerfile: Dockerfile
+    image: magalu-scraper:latest
+    platform: ${MAGALU_SCRAPER_PLATFORM:-linux/arm64}
+    container_name: magalu_scraper
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - TZ=America/Sao_Paulo
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - SESSION_DIR=/data/puppeteer_session
+      - MAGALU_REACTIVATE_AFTER_DAYS=${MAGALU_REACTIVATE_AFTER_DAYS:-5}
+      - SCRAPER_INTERVAL_SECONDS=${MAGALU_SCRAPER_INTERVAL_SECONDS:-1800}
+      - SCRAPER_DRY_RUN=${MAGALU_SCRAPER_DRY_RUN:-false}
+    volumes:
+      - ./puppeteer_session:/data/puppeteer_session
+      - ./python_scraper_magalu/debug_html:/app/debug_html
+      - ./python_scraper_magalu/logs:/app/logs
+      - ./python_scraper_magalu/screenshots:/app/screenshots
+    networks:
+      - n8n_network
+      - bearcave_shared
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   evolution-api:
     image: evoapicloud/evolution-api:latest
     container_name: evolution_api
@@ -149,66 +182,6 @@ services:
     depends_on:
       - n8n
       - evolution-api
-
-  # ---------------------------------------------------
-  # TYPEBOT SERVICES
-  # ---------------------------------------------------
-  typebot-builder:
-    image: baptistearno/typebot-builder:latest
-    container_name: typebot_builder
-    restart: unless-stopped
-    ports:
-      - "3001:3000"
-    environment:
-      - TZ=America/Sao_Paulo
-      - HOSTNAME=0.0.0.0
-      - REDIS_URL=redis://redis:6379
-      - DATABASE_URL=${DATABASE_URL}
-      - ENCRYPTION_SECRET=${ENCRYPTION_SECRET}
-      - NEXTAUTH_URL=${NEXTAUTH_URL}
-      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
-      - NEXT_PUBLIC_VIEWER_URL=${NEXT_PUBLIC_VIEWER_URL}
-      - ADMIN_EMAIL=${ADMIN_EMAIL}
-      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
-      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
-      - DISABLE_TELEMETRY=${DISABLE_TELEMETRY}
-    env_file:
-      - .env
-    networks:
-      - n8n_network
-      - bearcave_shared
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_started
-
-  typebot-viewer:
-    image: baptistearno/typebot-viewer:latest
-    container_name: typebot_viewer
-    restart: unless-stopped
-    ports:
-      - "3002:3000"
-    environment:
-      - TZ=America/Sao_Paulo
-      - HOSTNAME=0.0.0.0
-      - REDIS_URL=redis://redis:6379
-      - DATABASE_URL=${DATABASE_URL}
-      - ENCRYPTION_SECRET=${ENCRYPTION_SECRET}
-      - NEXTAUTH_URL=${NEXTAUTH_URL}
-      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
-      - NEXT_PUBLIC_VIEWER_URL=${NEXT_PUBLIC_VIEWER_URL}
-      - DISABLE_TELEMETRY=${DISABLE_TELEMETRY}
-    env_file:
-      - .env
-    networks:
-      - n8n_network
-      - bearcave_shared
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_started
 
 volumes:
   n8n_data:

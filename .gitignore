@@ -39,8 +39,9 @@ packages/cli/src/modules/my-feature
 .secrets
 packages/testing/**/.cursor/rules/
 .venv
-.ruff_cache
 __pycache__
+*.egg-info/
+*.egg-info
 packages/cli/THIRD_PARTY_LICENSES.md
 .coverage
 .nyc_output
@@ -75,6 +76,7 @@ task_log.txt
 
 # Ignora arquivos de backup e logs
 backups/
+docker-volume-backups/
 task_log.txt
 
 # Ignora arquivos de sessão do Puppeteer
